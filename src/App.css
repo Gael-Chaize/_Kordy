@@ -1,0 +1,339 @@
+.app-shell {
+  min-height: 100svh;
+  padding: 40px;
+}
+
+.song-header {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 32px;
+}
+
+.eyebrow {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  margin: 0 0 8px;
+  text-transform: uppercase;
+}
+
+.title-panel {
+  display: grid;
+  gap: 10px;
+  width: min(420px, 100%);
+}
+
+.song-title {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font-size: clamp(28px, 4vw, 44px);
+  font-weight: 800;
+  letter-spacing: 0;
+  line-height: 1;
+  padding: 0;
+}
+
+.tempo-control {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.transport-panel {
+  display: flex;
+  align-items: end;
+  gap: 12px;
+}
+
+.undo-button {
+  min-height: 43px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  font-weight: 800;
+  padding: 9px 14px;
+}
+
+.undo-button:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.undo-button:focus {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.tempo-control input {
+  width: 88px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  padding: 9px 10px;
+}
+
+.play-button {
+  min-height: 43px;
+  border: 1px solid var(--ink);
+  border-radius: 6px;
+  background: var(--ink);
+  color: var(--paper);
+  cursor: pointer;
+  font-weight: 800;
+  padding: 9px 18px;
+}
+
+.play-button.playing {
+  border-color: #237a3b;
+  background: #237a3b;
+  color: #ffffff;
+}
+
+.play-button:focus {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.toggle-button {
+  min-height: 43px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #ffffff;
+  color: var(--text);
+  cursor: pointer;
+  font-weight: 800;
+  padding: 9px 14px;
+}
+
+.toggle-button.active {
+  border-color: #237a3b;
+  background: #237a3b;
+  color: #ffffff;
+}
+
+.toggle-button:focus {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.secondary-button {
+  justify-self: start;
+  min-height: 32px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 800;
+  padding: 5px 10px;
+}
+
+.secondary-button:hover {
+  border-color: var(--focus);
+  color: var(--text);
+}
+
+.secondary-button:focus {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.progression-view {
+  display: grid;
+  gap: 28px;
+}
+
+.chart-section {
+  border-top: 2px solid var(--ink);
+  padding-top: 14px;
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.section-name {
+  width: min(280px, 100%);
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font: 700 18px/1.2 var(--sans);
+  padding: 0;
+}
+
+.remove-section-button {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: #8f2f28;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+  min-height: 32px;
+  padding: 5px 10px;
+}
+
+.remove-section-button:hover {
+  border-color: #b44a41;
+}
+
+.bar-lines {
+  display: grid;
+  gap: 18px;
+}
+
+.bar-line {
+  display: grid;
+  gap: 8px;
+}
+
+.bar-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(120px, 1fr));
+  border-top: 1px solid var(--ink);
+  border-left: 1px solid var(--ink);
+}
+
+.bar-cell {
+  position: relative;
+  display: grid;
+  min-height: 96px;
+  border-right: 1px solid var(--ink);
+  border-bottom: 1px solid var(--ink);
+  background: var(--paper);
+}
+
+.bar-number {
+  position: absolute;
+  top: 8px;
+  left: 10px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1;
+}
+
+.bar-cell input {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  box-sizing: border-box;
+  font: 700 24px/1 var(--sans);
+  padding: 32px 14px 18px;
+  text-align: center;
+  text-transform: none;
+  white-space: nowrap;
+}
+
+.bar-cell input.chord-count-2 {
+  word-spacing: 1.8rem;
+}
+
+.bar-cell input.chord-count-3 {
+  word-spacing: 1.45rem;
+}
+
+.bar-cell input.chord-count-4 {
+  word-spacing: 1.1rem;
+}
+
+.bar-line-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.bar-line-actions button {
+  min-height: 32px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 5px 10px;
+}
+
+.bar-line-actions button:hover {
+  border-color: var(--focus);
+}
+
+.bar-line-actions .add-section-button {
+  margin-right: auto;
+}
+
+.bar-line-actions .danger-button {
+  color: #8f2f28;
+}
+
+.bar-line-actions .danger-button:hover {
+  border-color: #b44a41;
+}
+
+.bar-cell input:focus,
+.section-name:focus,
+.song-title:focus,
+.tempo-control input:focus {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+}
+
+.bar-cell input::placeholder {
+  color: #b9b4aa;
+  font-weight: 500;
+}
+
+.invalid-bar {
+  background: #fff3f1;
+}
+
+.active-bar {
+  background: #e7f6df;
+}
+
+.invalid-bar input {
+  color: #b42318;
+}
+
+.invalid-bar input:focus {
+  outline-color: #b42318;
+}
+
+@media (max-width: 720px) {
+  .app-shell {
+    padding: 24px 16px;
+  }
+
+  .song-header {
+    align-items: start;
+    flex-direction: column;
+  }
+
+  .transport-panel {
+    align-items: end;
+    width: 100%;
+  }
+
+  .bar-grid {
+    grid-template-columns: repeat(2, minmax(120px, 1fr));
+  }
+}
