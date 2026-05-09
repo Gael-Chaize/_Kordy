@@ -6,6 +6,7 @@ export type Bar = {
 export type Section = {
   id: string
   name: string
+  repeatCount: number
   bars: Bar[]
 }
 

@@ -10,11 +10,49 @@ const initialSong: Song = {
     {
       id: 'intro',
       name: 'Intro',
+      repeatCount: 1,
       bars: [
         { id: 'intro-1', chord: '' },
         { id: 'intro-2', chord: '' },
         { id: 'intro-3', chord: '' },
         { id: 'intro-4', chord: '' },
+      ],
+    },
+  ],
+}
+
+const demoSong: Song = {
+  title: 'Song for my father (Horace Silver)',
+  tempo: 118,
+  sections: [
+    {
+      id: 'demo-a',
+      name: 'A',
+      repeatCount: 1,
+      bars: [
+        { id: 'demo-a-1', chord: 'Fm7' },
+        { id: 'demo-a-2', chord: '%' },
+        { id: 'demo-a-3', chord: 'Eb7' },
+        { id: 'demo-a-4', chord: '%' },
+        { id: 'demo-a-5', chord: 'Db7' },
+        { id: 'demo-a-6', chord: '% | C7' },
+        { id: 'demo-a-7', chord: 'Fm7' },
+        { id: 'demo-a-8', chord: '%' },
+      ],
+    },
+    {
+      id: 'demo-b',
+      name: 'B',
+      repeatCount: 1,
+      bars: [
+        { id: 'demo-b-1', chord: 'Eb7' },
+        { id: 'demo-b-2', chord: '%' },
+        { id: 'demo-b-3', chord: 'Fm7' },
+        { id: 'demo-b-4', chord: '%' },
+        { id: 'demo-b-5', chord: 'Eb7 | Db7' },
+        { id: 'demo-b-6', chord: '% | C7' },
+        { id: 'demo-b-7', chord: 'Fm7' },
+        { id: 'demo-b-8', chord: '%' },
       ],
     },
   ],
@@ -67,6 +105,10 @@ export function useProgression() {
     updateSong(() => initialSong)
   }
 
+  function loadDemoSong() {
+    updateSong(() => demoSong)
+  }
+
   function updateSongTitle(title: string) {
     updateSong((currentSong) => ({
       ...currentSong,
@@ -90,6 +132,19 @@ export function useProgression() {
       ...currentSong,
       sections: currentSong.sections.map((section) =>
         section.id === sectionId ? { ...section, name } : section,
+      ),
+    }))
+  }
+
+  function updateSectionRepeatCount(sectionId: string, repeatCount: number) {
+    if (!Number.isInteger(repeatCount) || repeatCount < 1) {
+      return
+    }
+
+    updateSong((currentSong) => ({
+      ...currentSong,
+      sections: currentSong.sections.map((section) =>
+        section.id === sectionId ? { ...section, repeatCount } : section,
       ),
     }))
   }
@@ -216,6 +271,67 @@ export function useProgression() {
     }))
   }
 
+  function moveBarLine(
+    fromSectionId: string,
+    fromStartIndex: number,
+    toSectionId: string,
+    toStartIndex: number,
+  ) {
+    updateSong((currentSong) => {
+      const fromSectionIndex = currentSong.sections.findIndex(
+        (section) => section.id === fromSectionId,
+      )
+      const toSectionIndex = currentSong.sections.findIndex(
+        (section) => section.id === toSectionId,
+      )
+
+      if (fromSectionIndex === -1 || toSectionIndex === -1) {
+        return currentSong
+      }
+
+      const sourceBars = currentSong.sections[fromSectionIndex].bars
+      const barsToMove = sourceBars.slice(fromStartIndex, fromStartIndex + 4)
+
+      if (barsToMove.length === 0) {
+        return currentSong
+      }
+
+      if (
+        fromSectionId === toSectionId &&
+        toStartIndex >= fromStartIndex &&
+        toStartIndex <= fromStartIndex + barsToMove.length
+      ) {
+        return currentSong
+      }
+
+      const nextSections = currentSong.sections.map((section) => ({
+        ...section,
+        bars: [...section.bars],
+      }))
+
+      nextSections[fromSectionIndex].bars.splice(
+        fromStartIndex,
+        barsToMove.length,
+      )
+
+      const adjustedToStartIndex =
+        fromSectionId === toSectionId && toStartIndex > fromStartIndex
+          ? toStartIndex - barsToMove.length
+          : toStartIndex
+
+      nextSections[toSectionIndex].bars.splice(
+        adjustedToStartIndex,
+        0,
+        ...barsToMove,
+      )
+
+      return {
+        ...currentSong,
+        sections: nextSections,
+      }
+    })
+  }
+
   function addSectionAfterLine(sectionId: string, startIndex: number) {
     updateSong((currentSong) => {
       const sectionIndex = currentSong.sections.findIndex(
@@ -242,6 +358,7 @@ export function useProgression() {
       nextSections.splice(sectionIndex + 1, 0, {
         id: nextSectionId,
         name: 'Verse',
+        repeatCount: 1,
         bars: shouldSplitSection
           ? currentSection.bars.slice(insertIndex)
           : createEmptyBars(nextSectionId, 4),
@@ -254,7 +371,7 @@ export function useProgression() {
     })
   }
 
-  function removeSection(sectionId: string) {
+  function mergeSection(sectionId: string) {
     updateSong((currentSong) => {
       const sectionIndex = currentSong.sections.findIndex(
         (section) => section.id === sectionId,
@@ -288,21 +405,94 @@ export function useProgression() {
     })
   }
 
+  function deleteSection(sectionId: string) {
+    updateSong((currentSong) => {
+      const sectionIndex = currentSong.sections.findIndex(
+        (section) => section.id === sectionId,
+      )
+
+      if (sectionIndex === -1) {
+        return currentSong
+      }
+
+      const nextSections = currentSong.sections.filter(
+        (section) => section.id !== sectionId,
+      )
+
+      if (nextSections.length > 0) {
+        return {
+          ...currentSong,
+          sections: nextSections,
+        }
+      }
+
+      const nextSectionId = createSectionId()
+
+      return {
+        ...currentSong,
+        sections: [
+          {
+            id: nextSectionId,
+            name: 'Intro',
+            repeatCount: 1,
+            bars: createEmptyBars(nextSectionId, 4),
+          },
+        ],
+      }
+    })
+  }
+
+  function duplicateSection(sectionId: string) {
+    updateSong((currentSong) => {
+      const sectionIndex = currentSong.sections.findIndex(
+        (section) => section.id === sectionId,
+      )
+
+      if (sectionIndex === -1) {
+        return currentSong
+      }
+
+      const sourceSection = currentSong.sections[sectionIndex]
+      const nextSectionId = createSectionId()
+      const duplicatedSection = {
+        ...sourceSection,
+        id: nextSectionId,
+        name: `${sourceSection.name} copy`,
+        bars: sourceSection.bars.map((bar) => ({
+          ...bar,
+          id: createBarId(nextSectionId),
+        })),
+      }
+      const nextSections = [...currentSong.sections]
+      nextSections.splice(sectionIndex + 1, 0, duplicatedSection)
+
+      return {
+        ...currentSong,
+        sections: nextSections,
+      }
+    })
+  }
+
   return {
     song,
     canUndo: history.past.length > 0,
     undo,
     createNewSong,
+    loadDemoSong,
     updateSongTitle,
     updateTempo,
     updateSectionName,
+    updateSectionRepeatCount,
     updateBarChord,
     normalizeBarChord,
     duplicateBars,
     addEmptyBarsAfter,
     deleteBars,
+    moveBarLine,
     addSectionAfterLine,
-    removeSection,
+    mergeSection,
+    deleteSection,
+    duplicateSection,
   }
 }
 

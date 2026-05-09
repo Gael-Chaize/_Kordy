@@ -12,11 +12,11 @@ export function loadStoredSong() {
   try {
     const parsedSong: unknown = JSON.parse(storedSong)
 
-    if (!isSong(parsedSong)) {
+    if (!isSongLike(parsedSong)) {
       return null
     }
 
-    return parsedSong
+    return normalizeSong(parsedSong)
   } catch {
     return null
   }
@@ -30,7 +30,13 @@ export function clearStoredSong() {
   window.localStorage.removeItem(STORAGE_KEY)
 }
 
-function isSong(value: unknown): value is Song {
+type StoredSong = Omit<Song, 'sections'> & {
+  sections: Array<Omit<Song['sections'][number], 'repeatCount'> & {
+    repeatCount?: number
+  }>
+}
+
+function isSongLike(value: unknown): value is StoredSong {
   if (!value || typeof value !== 'object') {
     return false
   }
@@ -45,10 +51,31 @@ function isSong(value: unknown): value is Song {
       (section) =>
         typeof section.id === 'string' &&
         typeof section.name === 'string' &&
+        (section.repeatCount === undefined ||
+          typeof section.repeatCount === 'number') &&
         Array.isArray(section.bars) &&
         section.bars.every(
           (bar) => typeof bar.id === 'string' && typeof bar.chord === 'string',
         ),
     )
   )
+}
+
+function normalizeSong(song: StoredSong): Song {
+  return {
+    ...song,
+    sections: song.sections.map((section) => {
+      const repeatCount = section.repeatCount
+
+      return {
+        ...section,
+        repeatCount:
+          repeatCount !== undefined &&
+          Number.isInteger(repeatCount) &&
+          repeatCount >= 1
+            ? repeatCount
+            : 1,
+      }
+    }),
+  }
 }

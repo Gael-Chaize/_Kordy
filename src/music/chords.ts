@@ -244,8 +244,31 @@ export function buildBarChordNotes(
 
   return {
     notes: parsedBar.chordSymbols.map((chord) => buildChordNotes(chord, octave)),
+    chordSymbols: parsedBar.chordSymbols,
     lastResolvedChord: parsedBar.lastResolvedChord,
   }
+}
+
+export function buildBassPatternNotes(chordSymbol: string, octave = 2) {
+  const chord = parseChordSymbol(chordSymbol)
+
+  if (!chord.valid) {
+    return null
+  }
+
+  const rootMidi = 12 * (octave + 1) + rootToSemitone(chord.root)
+  const intervals = chordIntervals.get(chord.quality)
+
+  if (!intervals) {
+    return null
+  }
+
+  const patternDegrees =
+    intervals.length >= 4 ? [0, 1, 2, 3, 2, 1, 0, 1] : [0, 1, 2, 0, 2, 1, 0, 1]
+
+  return patternDegrees.map((degreeIndex) =>
+    midiToNote(rootMidi + intervals[degreeIndex]),
+  )
 }
 
 function findRoot(chord: string) {
