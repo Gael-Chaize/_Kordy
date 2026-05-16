@@ -2,28 +2,51 @@ import type { Song } from '../music/types'
 
 const STORAGE_KEY = 'kordy.song.v1'
 
-export function loadStoredSong() {
-  const storedSong = window.localStorage.getItem(STORAGE_KEY)
+export type SongHistory = {
+  past: Song[]
+  present: Song
+}
 
-  if (!storedSong) {
+export function loadStoredHistory() {
+  const storedValue = window.localStorage.getItem(STORAGE_KEY)
+
+  if (!storedValue) {
     return null
   }
 
   try {
-    const parsedSong: unknown = JSON.parse(storedSong)
+    const parsedValue: unknown = JSON.parse(storedValue)
 
-    if (!isSongLike(parsedSong)) {
-      return null
+    if (isSongHistoryLike(parsedValue)) {
+      return normalizeHistory(parsedValue)
     }
 
-    return normalizeSong(parsedSong)
+    if (isSongLike(parsedValue)) {
+      return {
+        past: [],
+        present: normalizeSong(parsedValue),
+      }
+    }
+
+    return null
   } catch {
     return null
   }
 }
 
+export function loadStoredSong() {
+  return loadStoredHistory()?.present ?? null
+}
+
+export function saveStoredHistory(history: SongHistory) {
+  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(history))
+}
+
 export function saveStoredSong(song: Song) {
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(song))
+  saveStoredHistory({
+    past: [],
+    present: song,
+  })
 }
 
 export function clearStoredSong() {
@@ -36,6 +59,32 @@ type StoredSong = Omit<Song, 'sections'> & {
   }>
 }
 
+type StoredSongHistory = {
+  past: StoredSong[]
+  present: StoredSong
+}
+
+function isSongHistoryLike(value: unknown): value is StoredSongHistory {
+  if (!value || typeof value !== 'object') {
+    return false
+  }
+
+  const history = value as SongHistory
+
+  return (
+    Array.isArray(history.past) &&
+    history.past.every(isSongLike) &&
+    isSongLike(history.present)
+  )
+}
+
+function normalizeHistory(history: StoredSongHistory): SongHistory {
+  return {
+    past: history.past.map(normalizeSong),
+    present: normalizeSong(history.present),
+  }
+}
+
 function isSongLike(value: unknown): value is StoredSong {
   if (!value || typeof value !== 'object') {
     return false
@@ -45,6 +94,8 @@ function isSongLike(value: unknown): value is StoredSong {
 
   return (
     typeof song.title === 'string' &&
+    (song.artist === undefined || typeof song.artist === 'string') &&
+    (song.style === undefined || typeof song.style === 'string') &&
     typeof song.tempo === 'number' &&
     Array.isArray(song.sections) &&
     song.sections.every(
@@ -64,6 +115,8 @@ function isSongLike(value: unknown): value is StoredSong {
 function normalizeSong(song: StoredSong): Song {
   return {
     ...song,
+    artist: typeof song.artist === 'string' ? song.artist : 'Unknown artist',
+    style: typeof song.style === 'string' ? song.style : 'Pop',
     sections: song.sections.map((section) => {
       const repeatCount = section.repeatCount
 

@@ -180,10 +180,17 @@ export function ProgressionView({
                         section.id,
                         startIndex,
                         line.length,
+                        hasBarsAfterLine,
                       )
                     }
                     onDrop={(event) =>
-                      handleLineDrop(event, section.id, startIndex, line.length)
+                      handleLineDrop(
+                        event,
+                        section.id,
+                        startIndex,
+                        line.length,
+                        hasBarsAfterLine,
+                      )
                     }
                   >
                     <div className="bar-line-tools">
@@ -356,6 +363,7 @@ export function ProgressionView({
     sectionId: string,
     startIndex: number,
     lineLength: number,
+    hasBarsAfterLine: boolean,
   ) {
     if (!draggedLine) {
       return
@@ -363,11 +371,15 @@ export function ProgressionView({
 
     event.preventDefault()
     event.dataTransfer.dropEffect = 'move'
-    setDragTarget({
-      sectionId,
-      startIndex,
-      position: getDropPosition(event, lineLength),
-    })
+    setDragTarget(
+      getLineDropTarget(
+        event,
+        sectionId,
+        startIndex,
+        lineLength,
+        hasBarsAfterLine,
+      ),
+    )
   }
 
   function handleLineDrop(
@@ -375,14 +387,24 @@ export function ProgressionView({
     sectionId: string,
     startIndex: number,
     lineLength: number,
+    hasBarsAfterLine: boolean,
   ) {
     if (!draggedLine) {
       return
     }
 
     event.preventDefault()
-    const position = getDropPosition(event, lineLength)
-    const toStartIndex = position === 'before' ? startIndex : startIndex + lineLength
+    const dropTarget = getLineDropTarget(
+      event,
+      sectionId,
+      startIndex,
+      lineLength,
+      hasBarsAfterLine,
+    )
+    const toStartIndex =
+      dropTarget.position === 'before'
+        ? dropTarget.startIndex
+        : dropTarget.startIndex + lineLength
 
     onMoveBarLine(
       draggedLine.sectionId,
@@ -431,16 +453,30 @@ type DragTarget = DraggedLine & {
   position: 'before' | 'after'
 }
 
-function getDropPosition(event: DragEvent<HTMLDivElement>, lineLength: number) {
+function getLineDropTarget(
+  event: DragEvent<HTMLDivElement>,
+  sectionId: string,
+  startIndex: number,
+  lineLength: number,
+  hasBarsAfterLine: boolean,
+): DragTarget {
   const bounds = event.currentTarget.getBoundingClientRect()
   const pointerOffset = event.clientY - bounds.top
   const position = pointerOffset < bounds.height / 2 ? 'before' : 'after'
 
-  if (lineLength === 0) {
-    return 'before'
+  if (position === 'after' && hasBarsAfterLine) {
+    return {
+      sectionId,
+      startIndex: startIndex + lineLength,
+      position: 'before',
+    }
   }
 
-  return position
+  return {
+    sectionId,
+    startIndex,
+    position,
+  }
 }
 
 function isDraggedLine(

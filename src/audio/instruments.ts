@@ -70,9 +70,10 @@ export function createBassInstrument(): BassInstrument {
     },
   })
   const compressor = new Tone.Compressor(-18, 4)
+  const limiter = new Tone.Limiter(-3)
 
-  instrument.volume.value = -10
-  instrument.chain(compressor, Tone.Destination)
+  instrument.volume.value = isMobileAudioDevice() ? -13 : -10
+  instrument.chain(compressor, limiter, Tone.Destination)
 
   return {
     triggerAttackRelease(note, duration, time, velocity) {
@@ -84,6 +85,7 @@ export function createBassInstrument(): BassInstrument {
     dispose() {
       instrument.dispose()
       compressor.dispose()
+      limiter.dispose()
     },
   }
 }
@@ -112,6 +114,7 @@ function createDx7Ep() {
     },
   })
 
+  instrument.maxPolyphony = getMaxPolyphony()
   instrument.volume.value = -12
 
   return connectInstrument(instrument, {
@@ -144,6 +147,7 @@ function createRhodes() {
     },
   })
 
+  instrument.maxPolyphony = getMaxPolyphony()
   instrument.volume.value = -10
 
   return connectInstrument(instrument, {
@@ -177,6 +181,7 @@ function createBell() {
     },
   })
 
+  instrument.maxPolyphony = getMaxPolyphony()
   instrument.volume.value = -15
 
   return connectInstrument(instrument, {
@@ -199,6 +204,7 @@ function createBasicPiano() {
     },
   })
 
+  instrument.maxPolyphony = getMaxPolyphony()
   instrument.volume.value = -10
 
   return connectInstrument(instrument, {
@@ -212,6 +218,27 @@ function connectInstrument(
   instrument: Tone.PolySynth,
   options: { chorusDepth: number; reverbDecay: number; wet: number },
 ): ChordInstrument {
+  if (isMobileAudioDevice()) {
+    const compressor = new Tone.Compressor(-24, 4)
+    const limiter = new Tone.Limiter(-3)
+
+    instrument.chain(compressor, limiter, Tone.Destination)
+
+    return {
+      triggerAttackRelease(notes, duration, time, velocity) {
+        instrument.triggerAttackRelease(notes, duration, time, velocity)
+      },
+      releaseAll() {
+        instrument.releaseAll()
+      },
+      dispose() {
+        instrument.dispose()
+        compressor.dispose()
+        limiter.dispose()
+      },
+    }
+  }
+
   const chorus = new Tone.Chorus(1.4, 1.9, options.chorusDepth).start()
   const reverb = new Tone.Reverb({
     decay: options.reverbDecay,
@@ -235,4 +262,18 @@ function connectInstrument(
       compressor.dispose()
     },
   }
+}
+
+function getMaxPolyphony() {
+  return isMobileAudioDevice() ? 8 : 16
+}
+
+function isMobileAudioDevice() {
+  if (typeof navigator === 'undefined') {
+    return false
+  }
+
+  const userAgent = navigator.userAgent.toLowerCase()
+
+  return /android|iphone|ipad|ipod/.test(userAgent)
 }

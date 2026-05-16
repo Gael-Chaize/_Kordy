@@ -12,6 +12,8 @@ export type Section = {
 
 export type Song = {
   title: string
+  artist: string
+  style: string
   tempo: number
   sections: Section[]
 }

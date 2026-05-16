@@ -34,7 +34,7 @@ export async function playSong(
   song: Song,
   options: PlaybackOptions = { drumsEnabled: false },
 ) {
-  await Tone.start()
+  await prepareAudio()
   stopSong()
 
   const piano = getSynth(options.pianoSound ?? 'dx7')
@@ -120,9 +120,9 @@ export async function playSong(
             options.onChordStart?.(bar.id, chordIndex)
             piano.triggerAttackRelease(
               notes,
-              Math.max(0.1, chordDuration * 0.88),
+              Math.max(0.1, chordDuration * 0.78),
               undefined,
-              0.75,
+              0.62,
             )
           }, Math.ceil(chordOffset * 1000)),
         )
@@ -138,7 +138,7 @@ export async function playSong(
 }
 
 export async function previewChord(chordText: string, pianoSound: PianoSound) {
-  await Tone.start()
+  await prepareAudio()
 
   const playback = buildBarChordNotes(chordText)
 
@@ -146,7 +146,7 @@ export async function previewChord(chordText: string, pianoSound: PianoSound) {
     return
   }
 
-  getSynth(pianoSound).triggerAttackRelease(playback.notes[0], 0.65, undefined, 0.62)
+  getSynth(pianoSound).triggerAttackRelease(playback.notes[0], 0.55, undefined, 0.52)
 }
 
 export function stopSong() {
@@ -186,7 +186,7 @@ function scheduleBass(
           note,
           Math.max(0.08, beatDuration * 0.82),
           undefined,
-          0.68,
+          0.56,
         )
       }, Math.ceil(beat * beatDuration * 1000)),
     )
@@ -210,7 +210,7 @@ function scheduleBarDrums(beatDuration: number) {
         kit.kick.triggerAttackRelease('C1', '8n', undefined, 0.85)
 
         if (beat === 1 || beat === 3) {
-          kit.snare.triggerAttackRelease('16n', undefined, 0.55)
+          kit.snare.triggerAttackRelease('16n', undefined, 0.42)
         }
       }, Math.ceil(beat * beatDuration * 1000)),
     )
@@ -219,9 +219,21 @@ function scheduleBarDrums(beatDuration: number) {
   for (let step = 0; step < 8; step += 1) {
     activeTimers.push(
       window.setTimeout(() => {
-        kit.hiHat.triggerAttackRelease('32n', undefined, 0.22)
+        kit.hiHat.triggerAttackRelease('32n', undefined, 0.15)
       }, Math.ceil(step * beatDuration * 500)),
     )
+  }
+}
+
+async function prepareAudio() {
+  const context = Tone.getContext()
+
+  context.lookAhead = 0.12
+  Tone.Destination.volume.value = -4
+  await Tone.start()
+
+  if (context.state === 'suspended') {
+    await context.resume()
   }
 }
 

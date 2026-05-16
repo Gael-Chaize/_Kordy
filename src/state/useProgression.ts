@@ -1,10 +1,16 @@
 import { useEffect, useState } from 'react'
 import { normalizeBarChords, parseBarChords } from '../music/chords'
 import type { Song } from '../music/types'
-import { clearStoredSong, loadStoredSong, saveStoredSong } from './songStorage'
+import {
+  clearStoredSong,
+  loadStoredHistory,
+  saveStoredHistory,
+} from './songStorage'
 
 const initialSong: Song = {
   title: 'Untitled chart',
+  artist: 'Unknown artist',
+  style: 'Pop',
   tempo: 120,
   sections: [
     {
@@ -23,6 +29,8 @@ const initialSong: Song = {
 
 const demoSong: Song = {
   title: 'Song for my father (Horace Silver)',
+  artist: 'Horace Silver',
+  style: 'Hard bop',
   tempo: 118,
   sections: [
     {
@@ -59,16 +67,15 @@ const demoSong: Song = {
 }
 
 export function useProgression() {
-  const [history, setHistory] = useState(() => ({
-    past: [] as Song[],
-    present: loadStoredSong() ?? initialSong,
-  }))
+  const [history, setHistory] = useState(
+    () => loadStoredHistory() ?? { past: [] as Song[], present: initialSong },
+  )
 
   const song = history.present
 
   useEffect(() => {
-    saveStoredSong(song)
-  }, [song])
+    saveStoredHistory(history)
+  }, [history])
 
   function updateSong(updater: (currentSong: Song) => Song) {
     setHistory((currentHistory) => {
@@ -113,6 +120,20 @@ export function useProgression() {
     updateSong((currentSong) => ({
       ...currentSong,
       title,
+    }))
+  }
+
+  function updateSongArtist(artist: string) {
+    updateSong((currentSong) => ({
+      ...currentSong,
+      artist,
+    }))
+  }
+
+  function updateSongStyle(style: string) {
+    updateSong((currentSong) => ({
+      ...currentSong,
+      style,
     }))
   }
 
@@ -480,6 +501,8 @@ export function useProgression() {
     createNewSong,
     loadDemoSong,
     updateSongTitle,
+    updateSongArtist,
+    updateSongStyle,
     updateTempo,
     updateSectionName,
     updateSectionRepeatCount,

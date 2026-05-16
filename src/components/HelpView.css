@@ -1,0 +1,31 @@
+.help-view {
+  padding: 24px 20px 40px;
+  max-width: 980px;
+  margin: 0 auto;
+}
+
+.help-header h2 {
+  margin: 0;
+  font-size: 22px;
+  letter-spacing: -0.02em;
+}
+
+.help-header p {
+  margin: 6px 0 18px;
+  opacity: 0.8;
+}
+
+.help-content {
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    'Liberation Mono', 'Courier New', monospace;
+  font-size: 13px;
+  line-height: 1.5;
+  margin: 0;
+  padding: 16px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+}
+
