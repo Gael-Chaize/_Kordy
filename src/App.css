@@ -75,7 +75,7 @@
   width: 100%;
   border: 0;
   background: transparent;
-  color: var(--ink);
+  color: #1f5cff;
   font-size: clamp(22px, 3.2vw, 34px);
   font-weight: 800;
   letter-spacing: 0;
@@ -482,9 +482,11 @@
 }
 
 .print-preview {
-  max-width: 1040px;
+  box-sizing: border-box;
+  width: min(100%, 1120px);
+  aspect-ratio: 297 / 210;
   margin: 0 auto;
-  padding: 30px 34px 40px;
+  padding: min(3.2vw, 34px) min(3.8vw, 42px) min(4vw, 44px);
   border: 1px solid var(--border);
   background: var(--paper);
   color: var(--ink);
@@ -593,7 +595,7 @@
 
 .print-bar-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(120px, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   border-top: 2px solid var(--ink);
   border-left: 2px solid var(--ink);
 }
@@ -605,22 +607,75 @@
 .print-bar-cell {
   position: relative;
   display: grid;
-  min-height: 82px;
+  min-height: clamp(78px, 8.6vw, 96px);
   place-items: center;
   border-right: 2px solid var(--ink);
   border-bottom: 2px solid var(--ink);
   background: #fffefa;
-  padding: 18px 12px 14px;
+  padding: 14px 8px 12px;
 }
 
 .print-chords {
+  --chord-separator-gap: 0.28em;
   color: var(--ink);
-  font-size: 26px;
+  display: grid;
+  align-items: center;
+  justify-items: center;
+  font-size: clamp(18px, 2.2vw, 26px);
   font-weight: 800;
+  gap: 0;
   line-height: 1;
   text-align: center;
   white-space: nowrap;
+  width: 100%;
 }
+
+.print-chords span {
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  padding: 0 0.04em;
+  text-overflow: clip;
+}
+
+.print-chords span + span::before {
+  content: "|";
+  display: inline-block;
+  margin-right: var(--chord-separator-gap);
+}
+
+.print-chord-count-3 {
+  --chord-separator-gap: 0.2em;
+}
+
+.print-chord-count-4 {
+  --chord-separator-gap: 0.12em;
+  font-size: clamp(16px, 1.9vw, 23px);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  row-gap: 0.32em;
+}
+
+.print-chord-count-4 span + span::before {
+  content: none;
+}
+
+.print-chord-count-4 .with-row-separator::before {
+  content: "|";
+  display: inline-block;
+  width: 0;
+  margin-left: -0.18em;
+  margin-right: 0.42em;
+}
+
+.print-chord-count-2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.print-chord-count-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 
 .chart-section {
   border-top: 2px solid var(--ink);
@@ -891,16 +946,20 @@
   color: var(--ink);
   box-sizing: border-box;
   font: 700 24px/1 var(--sans);
-  padding: 32px 14px 18px;
+  padding: 32px 10px 18px;
   text-align: center;
   text-transform: none;
   white-space: nowrap;
 }
 
 .chord-color-overlay {
+  --chord-separator-gap: 0.28em;
   position: absolute;
-  inset: 30px 14px 16px;
-  display: block;
+  inset: 30px 10px 16px;
+  display: grid;
+  align-items: center;
+  justify-items: center;
+  gap: 0;
   opacity: 0;
   pointer-events: none;
   color: var(--ink);
@@ -909,16 +968,40 @@
   white-space: nowrap;
 }
 
-.chord-color-overlay.chord-count-2 {
-  word-spacing: 1.8rem;
+.chord-color-overlay span {
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  padding: 0 0.08em;
+  text-overflow: clip;
+}
+
+.chord-color-overlay span + span::before {
+  content: "|";
+  display: inline-block;
+  margin-right: var(--chord-separator-gap);
+}
+
+.chord-color-overlay.chord-count-2,
+.chord-color-overlay.chord-count-3,
+.chord-color-overlay.chord-count-4 {
+  word-spacing: 0;
 }
 
 .chord-color-overlay.chord-count-3 {
-  word-spacing: 1.45rem;
+  --chord-separator-gap: 0.2em;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .chord-color-overlay.chord-count-4 {
-  word-spacing: 1.1rem;
+  --chord-separator-gap: 0.12em;
+  font-size: 22px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.chord-color-overlay.chord-count-2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .active-bar .chord-color-overlay {
@@ -933,16 +1016,14 @@
   color: #237a3b;
 }
 
-.bar-cell input.chord-count-2 {
-  word-spacing: 1.8rem;
-}
-
-.bar-cell input.chord-count-3 {
-  word-spacing: 1.45rem;
+.bar-cell input.chord-count-2,
+.bar-cell input.chord-count-3,
+.bar-cell input.chord-count-4 {
+  word-spacing: 0;
 }
 
 .bar-cell input.chord-count-4 {
-  word-spacing: 1.1rem;
+  font-size: 22px;
 }
 
 .bar-line-actions {
@@ -1063,6 +1144,7 @@
   }
 
   .print-preview {
+    aspect-ratio: auto;
     padding: 22px 16px 28px;
   }
 
@@ -1095,7 +1177,9 @@
   }
 
   .print-preview {
+    aspect-ratio: auto;
     max-width: none;
+    width: auto;
     margin: 0;
     padding: 0;
     border: 0;

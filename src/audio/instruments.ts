@@ -11,12 +11,12 @@ export const pianoSoundOptions: Array<{ value: PianoSound; label: string }> = [
 
 export type ChordInstrument = {
   triggerAttackRelease: (
-    notes: string[],
+    notes: string[] | string,
     duration: number,
     time?: Tone.Unit.Time,
     velocity?: number,
   ) => void
-  releaseAll: () => void
+  releaseAll: (time?: Tone.Unit.Time) => void
   dispose: () => void
 }
 
@@ -47,33 +47,35 @@ export function createPianoInstrument(sound: PianoSound): ChordInstrument {
 export function createBassInstrument(): BassInstrument {
   const instrument = new Tone.MonoSynth({
     oscillator: {
-      type: 'sawtooth',
+      type: 'triangle',
     },
+    portamento: 0.016,
     filter: {
       type: 'lowpass',
-      frequency: 650,
+      frequency: 780,
       rolloff: -24,
     },
     envelope: {
-      attack: 0.006,
-      decay: 0.16,
-      sustain: 0.55,
-      release: 0.16,
+      attack: 0.028,
+      decay: 0.12,
+      sustain: 0.92,
+      release: 0.38,
     },
     filterEnvelope: {
-      attack: 0.002,
-      decay: 0.08,
-      sustain: 0.35,
-      release: 0.12,
-      baseFrequency: 80,
-      octaves: 3.2,
+      attack: 0.03,
+      decay: 0.22,
+      sustain: 0.08,
+      release: 0.22,
+      baseFrequency: 140,
+      octaves: 1.15,
     },
   })
+  const drive = new Tone.Distortion(0.14)
   const compressor = new Tone.Compressor(-18, 4)
   const limiter = new Tone.Limiter(-3)
 
   instrument.volume.value = isMobileAudioDevice() ? -13 : -10
-  instrument.chain(compressor, limiter, Tone.Destination)
+  instrument.chain(drive, compressor, limiter, Tone.Destination)
 
   return {
     triggerAttackRelease(note, duration, time, velocity) {
@@ -84,6 +86,7 @@ export function createBassInstrument(): BassInstrument {
     },
     dispose() {
       instrument.dispose()
+      drive.dispose()
       compressor.dispose()
       limiter.dispose()
     },
@@ -228,8 +231,8 @@ function connectInstrument(
       triggerAttackRelease(notes, duration, time, velocity) {
         instrument.triggerAttackRelease(notes, duration, time, velocity)
       },
-      releaseAll() {
-        instrument.releaseAll()
+      releaseAll(time) {
+        instrument.releaseAll(time)
       },
       dispose() {
         instrument.dispose()
@@ -252,8 +255,8 @@ function connectInstrument(
     triggerAttackRelease(notes, duration, time, velocity) {
       instrument.triggerAttackRelease(notes, duration, time, velocity)
     },
-    releaseAll() {
-      instrument.releaseAll()
+    releaseAll(time) {
+      instrument.releaseAll(time)
     },
     dispose() {
       instrument.dispose()
@@ -265,7 +268,7 @@ function connectInstrument(
 }
 
 function getMaxPolyphony() {
-  return isMobileAudioDevice() ? 8 : 16
+  return isMobileAudioDevice() ? 12 : 24
 }
 
 function isMobileAudioDevice() {

@@ -251,17 +251,15 @@ export function ProgressionView({
                             >
                               {getChordTokens(bar.chord).map(
                                 (chord, chordIndex) => (
-                                  <span key={`${chord}-${chordIndex}`}>
-                                    {chordIndex > 0 ? ' | ' : ''}
-                                    <span
-                                      className={
-                                        activeChordIndex === chordIndex
-                                          ? 'current-chord-text'
-                                          : ''
-                                      }
-                                    >
-                                      {chord}
-                                    </span>
+                                  <span
+                                    className={
+                                      activeChordIndex === chordIndex
+                                        ? 'current-chord-text'
+                                        : ''
+                                    }
+                                    key={`${chord}-${chordIndex}`}
+                                  >
+                                    {chord}
                                   </span>
                                 ),
                               )}

@@ -38,8 +38,22 @@ export function PrintPreview({ song }: PrintPreviewProps) {
                 <div className="print-bar-grid" key={`${section.id}-${lineIndex}`}>
                   {line.map((bar) => (
                     <div className="print-bar-cell" key={bar.id}>
-                      <span className="print-chords">
-                        {formatChordText(bar.chord)}
+                      <span
+                        className={`print-chords print-chord-count-${getChordTokens(bar.chord).length}`}
+                      >
+                        {getChordTokens(bar.chord).map((chord, chordIndex) => (
+                          <span
+                            className={
+                              getChordTokens(bar.chord).length === 4 &&
+                              (chordIndex === 1 || chordIndex === 3)
+                                ? 'with-row-separator'
+                                : ''
+                            }
+                            key={`${chord}-${chordIndex}`}
+                          >
+                            {chord}
+                          </span>
+                        ))}
                       </span>
                     </div>
                   ))}
@@ -63,10 +77,9 @@ function chunkBars<T>(bars: T[]) {
   return chunks
 }
 
-function formatChordText(chordText: string) {
+function getChordTokens(chordText: string) {
   return chordText
     .trim()
     .split(/\s*\|\s*|\s+/)
     .filter(Boolean)
-    .join(' | ')
 }

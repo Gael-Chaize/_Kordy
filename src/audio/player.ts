@@ -16,6 +16,8 @@ let kick: Tone.MembraneSynth | null = null
 let snare: Tone.NoiseSynth | null = null
 let hiHat: Tone.NoiseSynth | null = null
 let activeTimers: number[] = []
+let activeTransportEvents: number[] = []
+let activeChordPart: Tone.Part | null = null
 let resolvePlayback: (() => void) | null = null
 
 type PlaybackOptions = {
@@ -73,67 +75,125 @@ export async function playSong(
 
   return new Promise<void>((resolve) => {
     resolvePlayback = resolve
-    scheduleBar(0)
+    schedulePlayback()
   })
 
-  function scheduleBar(index: number) {
-    if (index >= bars.length) {
-      if (options.loopBarCount || options.loopSectionId) {
-        scheduleBar(0)
-      } else {
-        finishPlayback()
-      }
-      return
-    }
-
+  function schedulePlayback() {
     const tempo = options.getTempo?.() ?? song.tempo
     const beatDuration = 60 / tempo
     const barDuration = beatDuration * 4
-    const bar = bars[index]
-    const barPlayback = barPlaybacks[index]
 
-    options.onBarStart?.(bar.id)
-    options.onChordStart?.(bar.id, null)
+    Tone.Transport.stop()
+    Tone.Transport.cancel(0)
+    activeTransportEvents = []
+    activeChordPart?.dispose()
+    activeChordPart = null
 
-    if (options.drumsEnabled) {
-      scheduleBarDrums(beatDuration)
-    }
+    Tone.Transport.bpm.value = tempo
+    Tone.Transport.loop = false
+    Tone.Transport.loopStart = 0
+    Tone.Transport.seconds = 0
 
-    if (barPlayback) {
-      if (options.bassEnabled) {
-        scheduleBass(barPlayback.chordSymbols, beatDuration, bassInstrument)
+    let transportTime = 0
+    const chordEvents: Array<{
+      time: number
+      note: string
+      duration: number
+      velocity: number
+    }> = []
+
+    for (let index = 0; index < bars.length; index += 1) {
+      const bar = bars[index]
+      const barPlayback = barPlaybacks[index]
+
+      activeTransportEvents.push(
+        Tone.Transport.scheduleOnce(() => {
+          options.onBarStart?.(bar.id)
+          options.onChordStart?.(bar.id, null)
+        }, transportTime),
+      )
+
+      if (options.drumsEnabled) {
+        scheduleBarDrumsAt(transportTime, beatDuration)
       }
 
-      barPlayback.notes.forEach((notes, chordIndex) => {
-        if (!notes) {
-          return
+      if (barPlayback) {
+        if (options.bassEnabled) {
+          scheduleBassAt(
+            transportTime,
+            barPlayback.chordSymbols,
+            beatDuration,
+            bassInstrument,
+          )
         }
 
         const chordDuration = barDuration / 4
-        const chordOffset =
-          barPlayback.notes.length === 2
-            ? chordIndex * chordDuration * 2
-            : chordIndex * chordDuration
+        const chordSlotSeconds =
+          barPlayback.notes.length === 2 ? chordDuration * 2 : chordDuration
 
-        activeTimers.push(
-          window.setTimeout(() => {
-            options.onChordStart?.(bar.id, chordIndex)
-            piano.triggerAttackRelease(
+        barPlayback.notes.forEach((notes, chordIndex) => {
+          if (!notes) {
+            return
+          }
+
+          const chordOffset =
+            barPlayback.notes.length === 2
+              ? chordIndex * chordDuration * 2
+              : chordIndex * chordDuration
+          const chordStartTime = transportTime + chordOffset
+          const chordEndTime = chordStartTime + Math.max(0, chordSlotSeconds - 0.01)
+
+          activeTransportEvents.push(
+            Tone.Transport.scheduleOnce(() => {
+              options.onChordStart?.(bar.id, chordIndex)
+            }, chordStartTime),
+          )
+
+          // Prevent long-release presets (bell/rhodes) from piling up voices and
+          // causing missing notes on later chords: force a gentle cutoff at the
+          // end of each chord slot.
+          activeTransportEvents.push(
+            Tone.Transport.scheduleOnce(() => {
+              piano.releaseAll()
+            }, chordEndTime),
+          )
+
+          chordEvents.push(
+            ...buildRolledChordEvents(
               notes,
-              Math.max(0.1, chordDuration * 0.78),
-              undefined,
+              chordStartTime,
+              chordDuration,
+              chordSlotSeconds,
               0.62,
-            )
-          }, Math.ceil(chordOffset * 1000)),
-        )
-      })
+            ),
+          )
+        })
+      }
+
+      transportTime += barDuration
     }
 
-    activeTimers.push(
-      window.setTimeout(() => {
-        scheduleBar(index + 1)
-      }, Math.ceil(barDuration * 1000)),
-    )
+    activeChordPart = new Tone.Part((time, value) => {
+      piano.triggerAttackRelease(value.note, value.duration, time, value.velocity)
+    }, chordEvents)
+    activeChordPart.loop = false
+    activeChordPart.start(0)
+
+    const endTime = transportTime
+
+    if (options.loopBarCount || options.loopSectionId) {
+      Tone.Transport.loop = true
+      Tone.Transport.loopEnd = endTime
+    } else {
+      activeTransportEvents.push(
+        Tone.Transport.scheduleOnce(() => {
+          finishPlayback()
+        }, endTime),
+      )
+    }
+
+    // Start slightly in the future to guarantee all events are scheduled ahead.
+    Tone.Transport.start('+0.2')
   }
 }
 
@@ -146,12 +206,33 @@ export async function previewChord(chordText: string, pianoSound: PianoSound) {
     return
   }
 
-  getSynth(pianoSound).triggerAttackRelease(playback.notes[0], 0.55, undefined, 0.52)
+  const fallbackTempo = 120
+  const beatDuration = 60 / fallbackTempo
+  const lookAheadSeconds = Math.max(0.12, Tone.getContext().lookAhead ?? 0)
+  const startTime = Tone.now() + lookAheadSeconds + 0.02
+  const instrument = getSynth(pianoSound)
+
+  buildRolledChordEvents(playback.notes[0], 0, beatDuration, beatDuration, 0.52).forEach(
+    (event) => {
+      instrument.triggerAttackRelease(
+        event.note,
+        event.duration,
+        startTime + event.time,
+        event.velocity,
+      )
+    },
+  )
 }
 
 export function stopSong() {
   activeTimers.forEach((timerId) => window.clearTimeout(timerId))
   activeTimers = []
+  activeTransportEvents.forEach((eventId) => Tone.Transport.clear(eventId))
+  activeTransportEvents = []
+  activeChordPart?.dispose()
+  activeChordPart = null
+  Tone.Transport.cancel(0)
+  Tone.Transport.stop()
   synth?.releaseAll()
   bass?.releaseAll()
   kick?.triggerRelease()
@@ -160,7 +241,8 @@ export function stopSong() {
   finishPlayback()
 }
 
-function scheduleBass(
+function scheduleBassAt(
+  barStartTime: number,
   chordSymbols: string[],
   beatDuration: number,
   bassInstrument: BassInstrument,
@@ -173,22 +255,22 @@ function scheduleBass(
     const chordIndex =
       chordSymbols.length === 2 ? Math.floor(beat / 2) : Math.min(beat, chordSymbols.length - 1)
     const chordSymbol = chordSymbols[chordIndex]
-    const pattern = buildBassPatternNotes(chordSymbol, 3)
+    const pattern = buildBassPatternNotes(chordSymbol, 2)
     const note = pattern?.[beat % 8]
 
     if (!note) {
       continue
     }
 
-    activeTimers.push(
-      window.setTimeout(() => {
+    activeTransportEvents.push(
+      Tone.Transport.scheduleOnce(() => {
         bassInstrument.triggerAttackRelease(
           note,
-          Math.max(0.08, beatDuration * 0.82),
+          Math.max(0.1, beatDuration * 0.25),
           undefined,
           0.56,
         )
-      }, Math.ceil(beat * beatDuration * 1000)),
+      }, barStartTime + beat * beatDuration),
     )
   }
 }
@@ -201,28 +283,81 @@ function finishPlayback() {
   resolve?.()
 }
 
-function scheduleBarDrums(beatDuration: number) {
+function scheduleBarDrumsAt(barStartTime: number, beatDuration: number) {
   const kit = getDrumKit()
 
   for (let beat = 0; beat < 4; beat += 1) {
-    activeTimers.push(
-      window.setTimeout(() => {
+    activeTransportEvents.push(
+      Tone.Transport.scheduleOnce(() => {
         kit.kick.triggerAttackRelease('C1', '8n', undefined, 0.85)
 
         if (beat === 1 || beat === 3) {
           kit.snare.triggerAttackRelease('16n', undefined, 0.42)
         }
-      }, Math.ceil(beat * beatDuration * 1000)),
+      }, barStartTime + beat * beatDuration),
     )
   }
 
   for (let step = 0; step < 8; step += 1) {
-    activeTimers.push(
-      window.setTimeout(() => {
+    activeTransportEvents.push(
+      Tone.Transport.scheduleOnce(() => {
         kit.hiHat.triggerAttackRelease('32n', undefined, 0.15)
-      }, Math.ceil(step * beatDuration * 500)),
+      }, barStartTime + step * beatDuration * 0.5),
     )
   }
+}
+
+function buildRolledChordEvents(
+  notes: string[],
+  chordStartTime: number,
+  chordDuration: number,
+  chordSlotSeconds: number,
+  velocity: number,
+) {
+  const rolledNotes = [...notes]
+  const tonicUp = raiseNoteOctave(notes[0] ?? '', 1)
+  if (tonicUp) {
+    rolledNotes.push(tonicUp)
+  }
+
+  const maxNotes = 10
+  const limitedNotes = rolledNotes.length > maxNotes ? rolledNotes.slice(0, maxNotes) : rolledNotes
+
+  if (limitedNotes.length === 0) {
+    return [] as Array<{ time: number; note: string; duration: number; velocity: number }>
+  }
+
+  const totalSpreadSeconds = Math.max(0, Math.min(chordSlotSeconds / 8, chordDuration * 0.6))
+  const stepSeconds = limitedNotes.length > 1 ? totalSpreadSeconds / (limitedNotes.length - 1) : 0
+
+  return limitedNotes.map((note, index) => {
+    const offset = index * stepSeconds
+    const maxInsideSlot = Math.max(0.06, chordSlotSeconds - offset - 0.01)
+    const noteDuration = Math.max(
+      0.06,
+      Math.min(chordDuration * 0.78 - offset * 0.85, maxInsideSlot),
+    )
+    const noteVelocity = Math.max(0.05, velocity - index * 0.02)
+
+    return {
+      time: chordStartTime + offset,
+      note,
+      duration: noteDuration,
+      velocity: noteVelocity,
+    }
+  })
+}
+
+function raiseNoteOctave(note: string, octaves: number) {
+  // Expected format: <pitchClass><octave>, e.g. C4, Db3, F#5
+  const match = /^([A-G](?:#|b)?)(-?\d+)$/.exec(note)
+  if (!match) return null
+
+  const [, pitchClass, octaveText] = match
+  const octave = Number(octaveText)
+  if (!Number.isFinite(octave)) return null
+
+  return `${pitchClass}${octave + octaves}`
 }
 
 async function prepareAudio() {
