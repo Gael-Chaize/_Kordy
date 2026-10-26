@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react'
 import { createId } from '../music/createId'
 import { normalizeBarChords, parseBarChords } from '../music/chords'
 import type { Song } from '../music/types'
+import { appendImportedSongs } from './songBundles'
 import { canReferenceSection } from '../music/playbackSections'
-import { previewFontSizes, defaultPreviewFontSize, defaultChordColor, defaultGridColor } from '../music/previewSettings'
+import { previewFontSizes, previewFontDefaults, defaultChordColor, defaultGridColor, type PreviewFontField } from '../music/previewSettings'
 import {
   createSavedSong,
   loadSongLibrary,
@@ -118,6 +119,10 @@ export function useProgression() {
     }))
   }
 
+  function importSongs(songs: Song[]) {
+    setLibrary(current => ({ ...current, songs: appendImportedSongs(current.songs, songs) }))
+  }
+
   function updateSongTitle(title: string) {
     updateSong((currentSong) => ({
       ...currentSong,
@@ -130,9 +135,9 @@ export function useProgression() {
     updateSong(current => (current.transpose ?? 0) === transpose ? current : { ...current, transpose })
   }
 
-  function updatePreviewFontSize(field: 'chordFontSize' | 'lyricsFontSize', size: number) {
+  function updatePreviewFontSize(field: PreviewFontField, size: number) {
     if (!previewFontSizes.includes(size)) return
-    updateSong(current => (current[field] ?? defaultPreviewFontSize) === size ? current : { ...current, [field]: size })
+    updateSong(current => (current[field] ?? previewFontDefaults[field]) === size ? current : { ...current, [field]: size })
   }
 
   function updatePreviewBold(field: 'chordBold' | 'lyricsBold', bold: boolean) {
@@ -559,6 +564,7 @@ export function useProgression() {
     saveSong,
     isDirty,
     saveSongCopy,
+    importSongs,
     savedSongs: library.songs,
     activeSongId: library.activeSongId,
     storageError,

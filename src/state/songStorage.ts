@@ -167,25 +167,39 @@ function isSongLike(value: unknown): value is StoredSong {
     (song.lyricsBold === undefined || typeof song.lyricsBold === 'boolean') &&
     (song.chordFontSize === undefined || previewFontSizes.includes(song.chordFontSize)) &&
     (song.lyricsFontSize === undefined || previewFontSizes.includes(song.lyricsFontSize)) &&
+    (song.sectionFontSize === undefined || previewFontSizes.includes(song.sectionFontSize)) &&
+    (song.headerFontSize === undefined || previewFontSizes.includes(song.headerFontSize)) &&
     (song.transpose === undefined || (Number.isInteger(song.transpose) && Math.abs(song.transpose) <= 13)) &&
     (song.artist === undefined || typeof song.artist === 'string') &&
     (song.style === undefined || typeof song.style === 'string') &&
-    typeof song.tempo === 'number' &&
+    typeof song.tempo === 'number' && Number.isFinite(song.tempo) && song.tempo > 0 &&
     Array.isArray(song.sections) &&
     song.sections.every(
       (section) =>
+        section !== null && typeof section === 'object' &&
         typeof section.id === 'string' &&
         typeof section.name === 'string' &&
         (section.playbackSectionId === undefined || typeof section.playbackSectionId === 'string') &&
         (section.repeatCount === undefined ||
-          typeof section.repeatCount === 'number') &&
+          (Number.isInteger(section.repeatCount) && section.repeatCount >= 1)) &&
         Array.isArray(section.bars) &&
         section.bars.every(
-          (bar) => typeof bar.id === 'string' && typeof bar.chord === 'string' &&
+          (bar) => bar !== null && typeof bar === 'object' && typeof bar.id === 'string' && typeof bar.chord === 'string' &&
             (bar.lyrics === undefined || typeof bar.lyrics === 'string'),
         ),
     )
   )
+}
+
+export function readSongDocument(value: unknown): Song {
+  if (!isSongLike(value)) throw new Error('Invalid song data.')
+  const normalized = normalizeSong(value)
+  const sectionIds = normalized.sections.map(section => section.id)
+  const barIds = normalized.sections.flatMap(section => section.bars.map(bar => bar.id))
+  if (new Set(sectionIds).size !== sectionIds.length || new Set(barIds).size !== barIds.length) {
+    throw new Error('A song contains duplicate section or bar identifiers.')
+  }
+  return normalized
 }
 
 function normalizeSong(song: StoredSong): Song {

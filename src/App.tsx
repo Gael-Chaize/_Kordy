@@ -1,5 +1,8 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import './App.css'
+import '@fontsource/noto-sans/latin-400.css'
+import '@fontsource/noto-sans/latin-800.css'
+import { choosePdfDestination, type PdfDestination } from './export/pdfDestination'
 import {
   pianoSoundOptions,
   type PianoSound,
@@ -19,12 +22,14 @@ import { GeneratorView } from './components/GeneratorView'
 import { HelpView } from './components/HelpView'
 import { PrintPreview } from './components/PrintPreview'
 import { TransposeControl } from './components/TransposeControl'
-import { defaultPreviewFontSize, defaultChordColor, defaultGridColor } from './music/previewSettings'
+import { A4Preview } from './components/A4Preview'
+import { defaultPreviewFontSize, defaultSectionFontSize, defaultHeaderFontSize, defaultChordColor, defaultGridColor } from './music/previewSettings'
 import { ProgressionView } from './components/ProgressionView'
 import { SongLibrary } from './components/SongLibrary'
+import { ManageSongs } from './components/ManageSongs'
 import { useProgression } from './state/useProgression'
 
-type ViewMode = 'edit' | 'preview' | 'generate' | 'help'
+type ViewMode = 'edit' | 'preview' | 'generate' | 'help' | 'manage'
 
 const emptyGeneratedSong: Song = {
   title: 'Generated chart',
@@ -37,6 +42,12 @@ const emptyGeneratedSong: Song = {
 function App() {
   const [viewMode, setViewMode] = useState<ViewMode>('edit')
   const [libraryOpen, setLibraryOpen] = useState(false)
+  const [fitToA4, setFitToA4] = useState(false)
+  const [a4PageCount, setA4PageCount] = useState(0)
+  const [pdfAction, setPdfAction] = useState<'export' | 'print' | null>(null)
+  const [pdfError, setPdfError] = useState('')
+  const pdfDestination = useRef<Promise<PdfDestination | null>>(Promise.resolve(null))
+  const pdfRunning = useRef(false)
   const [isPlaying, setIsPlaying] = useState(false)
   const [drumsEnabled, setDrumsEnabled] = useState(true)
   const [bassEnabled, setBassEnabled] = useState(false)
@@ -70,6 +81,7 @@ function App() {
     saveSong,
     isDirty,
     saveSongCopy,
+    importSongs,
     savedSongs,
     activeSongId,
     storageError,
@@ -100,6 +112,25 @@ function App() {
   } = useProgression()
   const generatedSong = generatedHistory.present
   const activeSong = viewMode === 'generate' ? generatedSong : song
+  const printReadyPages = useCallback(async () => {
+    if (!pdfAction || pdfRunning.current) return
+    pdfRunning.current = true
+    try {
+      if (pdfAction === 'print') window.print()
+      else {
+        const destination = await pdfDestination.current
+        const { exportPdf } = await import('./export/exportPdf')
+        await exportPdf(song.title, destination)
+      }
+    } catch (error) {
+      if (!(error instanceof DOMException && error.name === 'AbortError')) {
+        setPdfError(error instanceof Error ? error.message : 'PDF export failed.')
+      }
+    } finally {
+      pdfRunning.current = false
+      setPdfAction(null)
+    }
+  }, [pdfAction, song.title])
   const tempoRef = useRef(activeSong.tempo)
   const playbackIdRef = useRef(0)
   const lastPreviewRef = useRef<string | null>(null)
@@ -450,6 +481,10 @@ function App() {
               >
                 Help
               </button>
+              <button type="button" className="secondary-button"
+                onClick={() => handleViewModeChange(viewMode === 'manage' ? 'edit' : 'manage')}>
+                Manage songs
+              </button>
             </div>
             <p className="save-status" role="status">
               {storageError
@@ -551,8 +586,29 @@ function App() {
       )}
       {viewMode === 'preview' && (
         <TransposeControl key={activeSongId} value={song.transpose ?? 0}
+          fitToA4={fitToA4}
+          a4PageCount={a4PageCount}
+          exportingPdf={pdfAction !== null}
+          onExportPdf={() => {
+            handleStopLine()
+            setPdfError('')
+            pdfDestination.current = choosePdfDestination(song.title)
+            // Attach a handler immediately while A4 pagination is being prepared.
+            void pdfDestination.current.catch(() => {})
+            setFitToA4(true)
+            setPdfAction('export')
+          }}
+          onPrintPdf={() => {
+            handleStopLine()
+            setPdfError('')
+            setFitToA4(true)
+            setPdfAction('print')
+          }}
+          onFitToA4Change={setFitToA4}
           chordFontSize={song.chordFontSize ?? defaultPreviewFontSize}
           lyricsFontSize={song.lyricsFontSize ?? defaultPreviewFontSize}
+          sectionFontSize={song.sectionFontSize ?? defaultSectionFontSize}
+          headerFontSize={song.headerFontSize ?? defaultHeaderFontSize}
           onFontSizeChange={updatePreviewFontSize}
           chordBold={song.chordBold ?? true}
           lyricsBold={song.lyricsBold ?? true}
@@ -566,6 +622,7 @@ function App() {
           updateTranspose(value)
         }} />
       )}
+      {pdfError && viewMode === 'preview' && <p className="pdf-export-error" role="alert">{pdfError}</p>}
       {viewMode === 'edit' ? (
         <ProgressionView
           song={song}
@@ -593,9 +650,17 @@ function App() {
           onStopLine={handleStopLine}
         />
       ) : viewMode === 'preview' ? (
+        fitToA4 ? (
+          <A4Preview>
+            <PrintPreview song={song} activeBarId={activeBarId} activeChord={activeChord} activeSectionId={activeSectionId} fitToA4 onPageCountChange={setA4PageCount} onPrintReady={pdfAction ? printReadyPages : undefined} />
+          </A4Preview>
+        ) : (
         <PrintPreview song={song} activeBarId={activeBarId} activeChord={activeChord} activeSectionId={activeSectionId} />
+        )
       ) : viewMode === 'help' ? (
         <HelpView />
+      ) : viewMode === 'manage' ? (
+        <ManageSongs songs={savedSongs} activeSongId={activeSongId} onImport={importSongs} />
       ) : (
         <GeneratorView
           song={generatedSong.sections.length > 0 ? generatedSong : null}

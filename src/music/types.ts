@@ -16,6 +16,8 @@ export type Song = {
   transpose?: number
   chordFontSize?: number
   lyricsFontSize?: number
+  sectionFontSize?: number
+  headerFontSize?: number
   chordBold?: boolean
   lyricsBold?: boolean
   chordColor?: string
