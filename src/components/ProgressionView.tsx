@@ -1,15 +1,19 @@
-import { useState, type DragEvent, type KeyboardEvent } from 'react'
+import { useRef, useState, type DragEvent, type KeyboardEvent } from 'react'
 import { isEmptyChord, parseBarChords } from '../music/chords'
 import type { Song } from '../music/types'
+import { canReferenceSection } from '../music/playbackSections'
 
 type ProgressionViewProps = {
   song: Song
   activeBarId: string | null
+  activeSectionId: string | null
   activeChord: { barId: string; chordIndex: number | null } | null
   onSectionNameChange: (sectionId: string, name: string) => void
+  onSectionPlaybackChange: (sectionId: string, targetId: string) => void
   onSectionRepeatCountChange: (sectionId: string, repeatCount: number) => void
   onDuplicateSection: (sectionId: string) => void
   onBarChange: (sectionId: string, barId: string, chord: string) => void
+  onLyricsChange: (sectionId: string, barId: string, lyrics: string) => void
   onBarBlur: (sectionId: string, barId: string) => void
   onDuplicateBars: (sectionId: string, startIndex: number) => void
   onAddEmptyBars: (sectionId: string, startIndex: number) => void
@@ -22,6 +26,7 @@ type ProgressionViewProps = {
   ) => void
   onAddSection: (sectionId: string, startIndex: number) => void
   onMergeSection: (sectionId: string) => void
+  onMoveSection: (fromId: string, toId: string, position: 'before' | 'after') => void
   onDeleteSection: (sectionId: string) => void
   onPlayLine: (barId: string) => void
   onLoopLine: (barId: string) => void
@@ -32,11 +37,14 @@ type ProgressionViewProps = {
 export function ProgressionView({
   song,
   activeBarId,
+  activeSectionId,
   activeChord,
   onSectionNameChange,
+  onSectionPlaybackChange,
   onSectionRepeatCountChange,
   onDuplicateSection,
   onBarChange,
+  onLyricsChange,
   onBarBlur,
   onDuplicateBars,
   onAddEmptyBars,
@@ -44,6 +52,7 @@ export function ProgressionView({
   onMoveBarLine,
   onAddSection,
   onMergeSection,
+  onMoveSection,
   onDeleteSection,
   onPlayLine,
   onLoopLine,
@@ -51,15 +60,94 @@ export function ProgressionView({
   onStopLine,
 }: ProgressionViewProps) {
   const barValidity = getBarValidity(song)
+  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(() => new Set())
   const [draggedLine, setDraggedLine] = useState<DraggedLine | null>(null)
   const [dragTarget, setDragTarget] = useState<DragTarget | null>(null)
+  const [draggedSection, setDraggedSection] = useState<string | null>(null)
+  const [sectionTarget, setSectionTarget] = useState<{ id: string; position: 'before' | 'after' } | null>(null)
+  const touchTarget = useRef<typeof sectionTarget>(null)
+
+  function targetSection(element: HTMLElement, y: number) {
+    const id = element.dataset.sectionId!
+    const bounds = element.getBoundingClientRect()
+    return { id, position: y < bounds.top + bounds.height / 2 ? 'before' as const : 'after' as const }
+  }
+
+  function clearSectionDrag() {
+    setDraggedSection(null)
+    setSectionTarget(null)
+    touchTarget.current = null
+  }
 
   return (
     <div className="progression-view">
       {song.sections.map((section) => (
-        <section className="chart-section" key={section.id}>
+        <section
+          className={['chart-section', draggedSection === section.id ? 'dragging-section' : '',
+            sectionTarget?.id === section.id ? `section-drop-${sectionTarget.position}` : ''].filter(Boolean).join(' ')}
+          key={section.id}
+          data-section-id={section.id}
+          onDragOver={event => {
+            if (!draggedSection || draggedSection === section.id) return
+            event.preventDefault()
+            event.dataTransfer.dropEffect = 'move'
+            setSectionTarget(targetSection(event.currentTarget, event.clientY))
+          }}
+          onDrop={event => {
+            if (!draggedSection) return
+            event.preventDefault()
+            const target = targetSection(event.currentTarget, event.clientY)
+            onMoveSection(draggedSection, target.id, target.position)
+            clearSectionDrag()
+          }}
+        >
           <header className="section-header">
             <div className="section-title-row">
+              <button
+                type="button"
+                className="section-drag-handle"
+                aria-label={`Move section ${section.name}`}
+                title="Drag to move section · Arrow keys to move up or down"
+                draggable
+                onDragStart={event => {
+                  setDraggedLine(null)
+                  setDragTarget(null)
+                  setDraggedSection(section.id)
+                  event.dataTransfer.effectAllowed = 'move'
+                  event.dataTransfer.setData('text/plain', section.id)
+                }}
+                onDragEnd={clearSectionDrag}
+                onPointerDown={event => {
+                  if (event.pointerType !== 'touch') return
+                  event.currentTarget.setPointerCapture(event.pointerId)
+                  setDraggedSection(section.id)
+                }}
+                onPointerMove={event => {
+                  if (event.pointerType !== 'touch' || !event.currentTarget.hasPointerCapture(event.pointerId)) return
+                  const element = document.elementFromPoint(event.clientX, event.clientY)?.closest<HTMLElement>('[data-section-id]')
+                  const target = element && element.dataset.sectionId !== section.id ? targetSection(element, event.clientY) : null
+                  touchTarget.current = target
+                  setSectionTarget(target)
+                  if (event.clientY < 60) window.scrollBy(0, -20)
+                  else if (event.clientY > window.innerHeight - 60) window.scrollBy(0, 20)
+                }}
+                onPointerUp={event => {
+                  if (event.pointerType !== 'touch') return
+                  const target = touchTarget.current
+                  if (target) onMoveSection(section.id, target.id, target.position)
+                  clearSectionDrag()
+                }}
+                onPointerCancel={event => {
+                  if (event.pointerType === 'touch') clearSectionDrag()
+                }}
+                onKeyDown={event => {
+                  if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return
+                  event.preventDefault()
+                  const index = song.sections.findIndex(item => item.id === section.id)
+                  const neighbor = song.sections[index + (event.key === 'ArrowUp' ? -1 : 1)]
+                  if (neighbor) onMoveSection(section.id, neighbor.id, event.key === 'ArrowUp' ? 'before' : 'after')
+                }}
+              ><span className="drag-grip-icon" aria-hidden="true" /></button>
               <button
                 type="button"
                 className="section-loop-button"
@@ -70,7 +158,7 @@ export function ProgressionView({
               </button>
               <input
                 aria-label="Section name"
-                className="section-name"
+                className={`section-name${activeSectionId === section.id ? ' playing-section-title' : ''}`}
                 value={section.name}
                 onChange={(event) =>
                   onSectionNameChange(section.id, event.target.value)
@@ -117,7 +205,21 @@ export function ProgressionView({
             </div>
           </header>
 
-          <div className="bar-lines">
+          <button
+            type="button"
+            className="section-collapse-button"
+            aria-label={`${collapsedSections.has(section.id) ? 'Expand' : 'Collapse'} section ${section.name}`}
+            aria-expanded={!collapsedSections.has(section.id)}
+            aria-controls={`section-bars-${section.id}`}
+            onClick={() => setCollapsedSections(current => {
+              const next = new Set(current)
+              if (next.has(section.id)) next.delete(section.id)
+              else next.add(section.id)
+              return next
+            })}
+          ><span className="section-chevron" aria-hidden="true" /></button>
+
+          <div className="bar-lines" id={`section-bars-${section.id}`} hidden={collapsedSections.has(section.id)}>
             {section.bars.length === 0 && (
               <div
                 className={[
@@ -133,6 +235,21 @@ export function ProgressionView({
                 }
                 onDrop={(event) => handleEmptySectionDrop(event, section.id)}
               >
+                <label className="section-playback-control">
+                  <span>Play</span>
+                  <select
+                    aria-label={`Playback for section ${section.name}`}
+                    value={song.sections.some(item => item.id === section.playbackSectionId) ? section.playbackSectionId ?? '' : ''}
+                    onChange={event => onSectionPlaybackChange(section.id, event.target.value)}
+                  >
+                    <option value="">Silence</option>
+                    {song.sections.filter(item => item.id !== section.id).map(item => (
+                      <option key={item.id} value={item.id} disabled={!canReferenceSection(song, section.id, item.id)}>
+                        {item.name || 'Untitled section'}
+                      </option>
+                    ))}
+                  </select>
+                </label>
                 <div className="bar-line-actions empty-section-actions">
                   <button
                     type="button"
@@ -234,7 +351,7 @@ export function ProgressionView({
                             : null
 
                         return (
-                          <label
+                          <div
                             className={[
                               'bar-cell',
                               isInvalid ? 'invalid-bar' : '',
@@ -245,6 +362,14 @@ export function ProgressionView({
                             key={bar.id}
                           >
                             <span className="bar-number">{barIndex + 1}</span>
+                            <input
+                              className="bar-lyrics"
+                              aria-label={`${section.name} bar ${barIndex + 1} lyrics`}
+                              value={bar.lyrics ?? ''}
+                              placeholder="Lyrics"
+                              onChange={event => onLyricsChange(section.id, bar.id, event.target.value)}
+                            />
+                            <div className="bar-chord-area">
                             <span
                               className={`chord-color-overlay chord-count-${chordCount}`}
                               aria-hidden="true"
@@ -280,7 +405,8 @@ export function ProgressionView({
                               onKeyDown={(event) => handleBarKeyDown(event)}
                               onBlur={() => onBarBlur(section.id, bar.id)}
                             />
-                          </label>
+                            </div>
+                          </div>
                         )
                       })}
                     </div>

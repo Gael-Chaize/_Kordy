@@ -1,10 +1,14 @@
 import { useEffect, useState } from 'react'
+import { createId } from '../music/createId'
 import { normalizeBarChords, parseBarChords } from '../music/chords'
 import type { Song } from '../music/types'
+import { canReferenceSection } from '../music/playbackSections'
+import { previewFontSizes, defaultPreviewFontSize, defaultChordColor, defaultGridColor } from '../music/previewSettings'
 import {
-  clearStoredSong,
-  loadStoredHistory,
-  saveStoredHistory,
+  createSavedSong,
+  loadSongLibrary,
+  saveSongLibrary,
+  type SongHistory,
 } from './songStorage'
 
 const initialSong: Song = {
@@ -27,55 +31,34 @@ const initialSong: Song = {
   ],
 }
 
-const demoSong: Song = {
-  title: 'Song for my father (Horace Silver)',
-  artist: 'Horace Silver',
-  style: 'Hard bop',
-  tempo: 118,
-  sections: [
-    {
-      id: 'demo-a',
-      name: 'A',
-      repeatCount: 1,
-      bars: [
-        { id: 'demo-a-1', chord: 'Fm7' },
-        { id: 'demo-a-2', chord: '%' },
-        { id: 'demo-a-3', chord: 'Eb7' },
-        { id: 'demo-a-4', chord: '%' },
-        { id: 'demo-a-5', chord: 'Db7' },
-        { id: 'demo-a-6', chord: '% | C7' },
-        { id: 'demo-a-7', chord: 'Fm7' },
-        { id: 'demo-a-8', chord: '%' },
-      ],
-    },
-    {
-      id: 'demo-b',
-      name: 'B',
-      repeatCount: 1,
-      bars: [
-        { id: 'demo-b-1', chord: 'Eb7' },
-        { id: 'demo-b-2', chord: '%' },
-        { id: 'demo-b-3', chord: 'Fm7' },
-        { id: 'demo-b-4', chord: '%' },
-        { id: 'demo-b-5', chord: 'Eb7 | Db7' },
-        { id: 'demo-b-6', chord: '% | C7' },
-        { id: 'demo-b-7', chord: 'Fm7' },
-        { id: 'demo-b-8', chord: '%' },
-      ],
-    },
-  ],
-}
-
 export function useProgression() {
-  const [history, setHistory] = useState(
-    () => loadStoredHistory() ?? { past: [] as Song[], present: initialSong },
-  )
+  const [library, setLibrary] = useState(loadSongLibrary)
+  const [storageError, setStorageError] = useState(false)
+  const activeEntry = library.songs.find(entry => entry.id === library.activeSongId)!
+  const history = activeEntry.history
+  const isDirty = JSON.stringify(history.present) !== JSON.stringify(activeEntry.savedSong)
+
+  function setHistory(updater: (current: SongHistory) => SongHistory) {
+    setLibrary(current => ({
+      ...current,
+      songs: current.songs.map(entry => {
+        if (entry.id !== current.activeSongId) return entry
+        const nextHistory = updater(entry.history)
+        return nextHistory === entry.history ? entry : {
+          ...entry, history: nextHistory, updatedAt: new Date().toISOString(),
+        }
+      }),
+    }))
+  }
 
   const song = history.present
 
   useEffect(() => {
-    saveStoredHistory(history)
-  }, [history])
+    let failed = false
+    try { saveSongLibrary(library) } catch { failed = true }
+    const notification = window.setTimeout(() => setStorageError(failed), 0)
+    return () => window.clearTimeout(notification)
+  }, [library])
 
   function updateSong(updater: (currentSong: Song) => Song) {
     setHistory((currentHistory) => {
@@ -108,12 +91,31 @@ export function useProgression() {
   }
 
   function createNewSong() {
-    clearStoredSong()
-    updateSong(() => initialSong)
+    const entry = { ...createSavedSong(initialSong), savedSong: null }
+    setLibrary(current => ({
+      ...current, activeSongId: entry.id, songs: [...current.songs, entry],
+    }))
   }
 
-  function loadDemoSong() {
-    updateSong(() => demoSong)
+  function loadSong(id: string) {
+    setLibrary(current => current.songs.some(entry => entry.id === id)
+      ? { ...current, activeSongId: id } : current)
+  }
+
+  function saveSong() {
+    setLibrary(current => ({
+      ...current,
+      songs: current.songs.map(entry => entry.id === current.activeSongId
+        ? { ...entry, savedSong: entry.history.present, updatedAt: new Date().toISOString() }
+        : entry),
+    }))
+  }
+
+  function saveSongCopy(song: Song) {
+    const entry = createSavedSong(song)
+    setLibrary(current => ({
+      ...current, activeSongId: entry.id, songs: [...current.songs, entry],
+    }))
   }
 
   function updateSongTitle(title: string) {
@@ -121,6 +123,30 @@ export function useProgression() {
       ...currentSong,
       title,
     }))
+  }
+
+  function updateTranspose(transpose: number) {
+    if (!Number.isInteger(transpose) || Math.abs(transpose) > 13) return
+    updateSong(current => (current.transpose ?? 0) === transpose ? current : { ...current, transpose })
+  }
+
+  function updatePreviewFontSize(field: 'chordFontSize' | 'lyricsFontSize', size: number) {
+    if (!previewFontSizes.includes(size)) return
+    updateSong(current => (current[field] ?? defaultPreviewFontSize) === size ? current : { ...current, [field]: size })
+  }
+
+  function updatePreviewBold(field: 'chordBold' | 'lyricsBold', bold: boolean) {
+    updateSong(current => (current[field] ?? true) === bold ? current : { ...current, [field]: bold })
+  }
+
+  function updateChordColor(color: string) {
+    if (!/^#[0-9a-f]{6}$/i.test(color)) return
+    updateSong(current => (current.chordColor ?? defaultChordColor) === color ? current : { ...current, chordColor: color })
+  }
+
+  function updateGridColor(color: string) {
+    if (!/^#[0-9a-f]{6}$/i.test(color)) return
+    updateSong(current => (current.gridColor ?? defaultGridColor) === color ? current : { ...current, gridColor: color })
   }
 
   function updateSongArtist(artist: string) {
@@ -157,6 +183,14 @@ export function useProgression() {
     }))
   }
 
+  function updateSectionPlayback(sectionId: string, targetId: string) {
+    updateSong(current => {
+      if (targetId && !canReferenceSection(current, sectionId, targetId)) return current
+      return { ...current, sections: current.sections.map(section => section.id === sectionId
+        ? { ...section, playbackSectionId: targetId || undefined } : section) }
+    })
+  }
+
   function updateSectionRepeatCount(sectionId: string, repeatCount: number) {
     if (!Number.isInteger(repeatCount) || repeatCount < 1) {
       return
@@ -172,6 +206,16 @@ export function useProgression() {
 
   function updateBarChord(sectionId: string, barId: string, chord: string) {
     updateBar(sectionId, barId, chord)
+  }
+
+  function updateBarLyrics(sectionId: string, barId: string, lyrics: string) {
+    updateSong(currentSong => ({
+      ...currentSong,
+      sections: currentSong.sections.map(section => section.id === sectionId ? {
+        ...section,
+        bars: section.bars.map(bar => bar.id === barId ? { ...bar, lyrics } : bar),
+      } : section),
+    }))
   }
 
   function normalizeBarChord(sectionId: string, barId: string) {
@@ -285,8 +329,7 @@ export function useProgression() {
 
         return {
           ...section,
-          bars:
-            nextBars.length > 0 ? nextBars : createEmptyBars(section.id, 4),
+          bars: nextBars,
         }
       }),
     }))
@@ -426,6 +469,19 @@ export function useProgression() {
     })
   }
 
+  function moveSection(fromId: string, toId: string, position: 'before' | 'after') {
+    updateSong(current => {
+      if (fromId === toId) return current
+      const moved = current.sections.find(section => section.id === fromId)
+      if (!moved || !current.sections.some(section => section.id === toId)) return current
+      const sections = current.sections.filter(section => section.id !== fromId)
+      const index = sections.findIndex(section => section.id === toId)
+      sections.splice(index + (position === 'after' ? 1 : 0), 0, moved)
+      if (sections.every((section, i) => section === current.sections[i])) return current
+      return { ...current, sections }
+    })
+  }
+
   function deleteSection(sectionId: string) {
     updateSong((currentSong) => {
       const sectionIndex = currentSong.sections.findIndex(
@@ -499,14 +555,27 @@ export function useProgression() {
     canUndo: history.past.length > 0,
     undo,
     createNewSong,
-    loadDemoSong,
+    loadSong,
+    saveSong,
+    isDirty,
+    saveSongCopy,
+    savedSongs: library.songs,
+    activeSongId: library.activeSongId,
+    storageError,
     updateSongTitle,
+    updateTranspose,
+    updatePreviewFontSize,
+    updatePreviewBold,
+    updateChordColor,
+    updateGridColor,
     updateSongArtist,
     updateSongStyle,
     updateTempo,
     updateSectionName,
+    updateSectionPlayback,
     updateSectionRepeatCount,
     updateBarChord,
+    updateBarLyrics,
     normalizeBarChord,
     duplicateBars,
     addEmptyBarsAfter,
@@ -514,6 +583,7 @@ export function useProgression() {
     moveBarLine,
     addSectionAfterLine,
     mergeSection,
+    moveSection,
     deleteSection,
     duplicateSection,
   }
@@ -558,11 +628,11 @@ function getPreviousResolvedChord(song: Song, targetBarId: string) {
 }
 
 function createBarId(sectionId: string) {
-  return `${sectionId}-${crypto.randomUUID()}`
+  return `${sectionId}-${createId()}`
 }
 
 function createSectionId() {
-  return `section-${crypto.randomUUID()}`
+  return `section-${createId()}`
 }
 
 function createEmptyBars(sectionId: string, count: number) {

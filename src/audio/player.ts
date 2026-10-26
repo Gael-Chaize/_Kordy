@@ -8,6 +8,8 @@ import {
 } from './instruments'
 import { buildBarChordNotes, buildBassPatternNotes } from '../music/chords'
 import type { Song } from '../music/types'
+import { getPlaybackBars } from '../music/playbackSections'
+import { transposeNote } from '../music/transpose'
 
 let synth: ChordInstrument | null = null
 let bass: BassInstrument | null = null
@@ -28,6 +30,7 @@ type PlaybackOptions = {
   loopBarCount?: number
   loopSectionId?: string
   onBarStart?: (barId: string) => void
+  onSectionStart?: (sectionId: string) => void
   onChordStart?: (barId: string, chordIndex: number | null) => void
   getTempo?: () => number
 }
@@ -41,11 +44,9 @@ export async function playSong(
 
   const piano = getSynth(options.pianoSound ?? 'dx7')
   const bassInstrument = getBass()
-  const allBars = song.sections.flatMap((section) =>
-    Array.from({ length: section.repeatCount }, () =>
-      section.bars.map((bar) => ({ bar, sectionId: section.id })),
-    ).flat(),
-  )
+  const allBars = getPlaybackBars(song)
+  if (allBars.length === 0 || (options.loopSectionId !== undefined &&
+    !allBars.some(entry => entry.sectionId === options.loopSectionId))) return
   const requestedStartIndex =
     options.loopSectionId !== undefined
       ? allBars.findIndex((entry) => entry.sectionId === options.loopSectionId)
@@ -61,6 +62,7 @@ export async function playSong(
       ? Math.min(startIndex + sectionLoopCount, allBars.length)
     : allBars.length
   const bars = allBars.slice(startIndex, endIndex).map((entry) => entry.bar)
+  const sectionIds = allBars.slice(startIndex, endIndex).map(entry => entry.sectionId)
   let previousChord: string | null = null
   const allBarPlaybacks = allBars.map(({ bar }) => {
     const playback = buildBarChordNotes(bar.chord, previousChord)
@@ -109,6 +111,7 @@ export async function playSong(
       activeTransportEvents.push(
         Tone.Transport.scheduleOnce(() => {
           options.onBarStart?.(bar.id)
+          options.onSectionStart?.(sectionIds[index])
           options.onChordStart?.(bar.id, null)
         }, transportTime),
       )
@@ -124,6 +127,7 @@ export async function playSong(
             barPlayback.chordSymbols,
             beatDuration,
             bassInstrument,
+            song.transpose ?? 0,
           )
         }
 
@@ -160,7 +164,7 @@ export async function playSong(
 
           chordEvents.push(
             ...buildRolledChordEvents(
-              notes,
+              notes.map(note => transposeNote(note, song.transpose ?? 0)),
               chordStartTime,
               chordDuration,
               chordSlotSeconds,
@@ -246,6 +250,7 @@ function scheduleBassAt(
   chordSymbols: string[],
   beatDuration: number,
   bassInstrument: BassInstrument,
+  transpose = 0,
 ) {
   if (chordSymbols.length === 0) {
     return
@@ -265,7 +270,7 @@ function scheduleBassAt(
     activeTransportEvents.push(
       Tone.Transport.scheduleOnce(() => {
         bassInstrument.triggerAttackRelease(
-          note,
+          transposeNote(note, transpose),
           Math.max(0.1, beatDuration * 0.25),
           undefined,
           0.56,

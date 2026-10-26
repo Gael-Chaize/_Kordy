@@ -1,4 +1,5 @@
 import type { Song } from './types'
+import { createId } from './createId'
 
 export type Accidental = '' | 'b' | '#'
 
@@ -139,11 +140,11 @@ export function createGeneratedSong(
     tempo,
     sections: [
       {
-        id: `generated-section-${crypto.randomUUID()}`,
+        id: `generated-section-${createId()}`,
         name: 'Generated',
         repeatCount: 1,
         bars: getFourBarCadence(cadence.degrees).map((degreeChord) => ({
-          id: `generated-bar-${crypto.randomUUID()}`,
+          id: `generated-bar-${createId()}`,
           chord:
             degreeChord === '%'
               ? '%'

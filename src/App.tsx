@@ -14,10 +14,14 @@ import {
   type Accidental,
 } from './music/generator'
 import type { Song } from './music/types'
+import { getPlaybackBars } from './music/playbackSections'
 import { GeneratorView } from './components/GeneratorView'
 import { HelpView } from './components/HelpView'
 import { PrintPreview } from './components/PrintPreview'
+import { TransposeControl } from './components/TransposeControl'
+import { defaultPreviewFontSize, defaultChordColor, defaultGridColor } from './music/previewSettings'
 import { ProgressionView } from './components/ProgressionView'
+import { SongLibrary } from './components/SongLibrary'
 import { useProgression } from './state/useProgression'
 
 type ViewMode = 'edit' | 'preview' | 'generate' | 'help'
@@ -32,6 +36,7 @@ const emptyGeneratedSong: Song = {
 
 function App() {
   const [viewMode, setViewMode] = useState<ViewMode>('edit')
+  const [libraryOpen, setLibraryOpen] = useState(false)
   const [isPlaying, setIsPlaying] = useState(false)
   const [drumsEnabled, setDrumsEnabled] = useState(true)
   const [bassEnabled, setBassEnabled] = useState(false)
@@ -51,6 +56,7 @@ function App() {
     defaultGeneratorAccidental,
   )
   const [activeBarId, setActiveBarId] = useState<string | null>(null)
+  const [activeSectionId, setActiveSectionId] = useState<string | null>(null)
   const [activeChord, setActiveChord] = useState<{
     barId: string
     chordIndex: number | null
@@ -60,15 +66,28 @@ function App() {
     canUndo,
     undo,
     createNewSong,
-    loadDemoSong,
+    loadSong,
+    saveSong,
+    isDirty,
+    saveSongCopy,
+    savedSongs,
+    activeSongId,
+    storageError,
     updateSongTitle,
+    updateTranspose,
+    updatePreviewFontSize,
+    updatePreviewBold,
+    updateChordColor,
+    updateGridColor,
     updateSongArtist,
     updateSongStyle,
     updateTempo,
     updateSectionName,
+    updateSectionPlayback,
     updateSectionRepeatCount,
     duplicateSection,
     updateBarChord,
+    updateBarLyrics,
     normalizeBarChord,
     duplicateBars,
     addEmptyBarsAfter,
@@ -76,6 +95,7 @@ function App() {
     moveBarLine,
     addSectionAfterLine,
     mergeSection,
+    moveSection,
     deleteSection,
   } = useProgression()
   const generatedSong = generatedHistory.present
@@ -91,6 +111,7 @@ function App() {
   function clearPlaybackState() {
     setIsPlaying(false)
     setActiveBarId(null)
+    setActiveSectionId(null)
     setActiveChord(null)
   }
 
@@ -104,6 +125,7 @@ function App() {
     stopSong()
     setIsPlaying(true)
     setActiveBarId(null)
+    setActiveSectionId(null)
     setActiveChord(null)
 
     try {
@@ -115,6 +137,7 @@ function App() {
         loopBarCount,
         loopSectionId,
         onBarStart: setActiveBarId,
+        onSectionStart: setActiveSectionId,
         onChordStart: (barId, chordIndex) =>
           setActiveChord({ barId, chordIndex }),
         getTempo: () => tempoRef.current,
@@ -134,10 +157,7 @@ function App() {
       return
     }
 
-    const totalBars = activeSong.sections.reduce(
-      (count, section) => count + section.bars.length * section.repeatCount,
-      0,
-    )
+    const totalBars = getPlaybackBars(activeSong).length
 
     if (totalBars === 0) {
       return
@@ -176,10 +196,12 @@ function App() {
     createNewSong()
   }
 
-  function handleDemoSong() {
+  function handleLoadSong(id: string) {
     stopSong()
     clearPlaybackState()
-    loadDemoSong()
+    loadSong(id)
+    setViewMode('edit')
+    setLibraryOpen(false)
   }
 
   function handleUndo() {
@@ -385,10 +407,24 @@ function App() {
               <button
                 type="button"
                 className="secondary-button"
-                onClick={handleDemoSong}
+                onClick={() => setLibraryOpen(true)}
               >
-                Demo song
+                Load song
               </button>
+              <button
+                type="button"
+                className={`secondary-button save-song-button${(viewMode === 'generate' ? generatedSong.sections.length > 0 : isDirty) ? ' dirty' : ''}`}
+                disabled={viewMode === 'generate' ? generatedSong.sections.length === 0 : !isDirty}
+                onClick={() => {
+                  if (viewMode === 'generate') {
+                    handleStopLine()
+                    saveSongCopy(generatedSong)
+                    setViewMode('edit')
+                  } else {
+                    saveSong()
+                  }
+                }}
+              >Save song</button>
               <button
                 type="button"
                 className="secondary-button"
@@ -415,6 +451,12 @@ function App() {
                 Help
               </button>
             </div>
+            <p className="save-status" role="status">
+              {storageError
+                ? 'Local saving failed. Keep this page open to preserve your changes.'
+                : viewMode === 'generate' ? 'Save this idea to keep it in your songs.'
+                : isDirty ? 'Unsaved changes · Draft kept in this browser' : 'Song saved in this browser'}
+            </p>
           </div>
         </div>
         <div className="transport-stack">
@@ -503,15 +545,39 @@ function App() {
         </div>
       </header>
 
+      {libraryOpen && (
+        <SongLibrary songs={savedSongs} activeSongId={activeSongId}
+          onLoad={handleLoadSong} onClose={() => setLibraryOpen(false)} />
+      )}
+      {viewMode === 'preview' && (
+        <TransposeControl key={activeSongId} value={song.transpose ?? 0}
+          chordFontSize={song.chordFontSize ?? defaultPreviewFontSize}
+          lyricsFontSize={song.lyricsFontSize ?? defaultPreviewFontSize}
+          onFontSizeChange={updatePreviewFontSize}
+          chordBold={song.chordBold ?? true}
+          lyricsBold={song.lyricsBold ?? true}
+          onBoldChange={updatePreviewBold}
+          chordColor={song.chordColor ?? defaultChordColor}
+          onChordColorChange={updateChordColor}
+          gridColor={song.gridColor ?? defaultGridColor}
+          onGridColorChange={updateGridColor}
+          onChange={value => {
+          handleStopLine()
+          updateTranspose(value)
+        }} />
+      )}
       {viewMode === 'edit' ? (
         <ProgressionView
           song={song}
           activeBarId={activeBarId}
+          activeSectionId={activeSectionId}
           activeChord={activeChord}
           onSectionNameChange={updateSectionName}
+          onSectionPlaybackChange={updateSectionPlayback}
           onSectionRepeatCountChange={updateSectionRepeatCount}
           onDuplicateSection={duplicateSection}
           onBarChange={handleBarChange}
+          onLyricsChange={updateBarLyrics}
           onBarBlur={normalizeBarChord}
           onDuplicateBars={duplicateBars}
           onAddEmptyBars={addEmptyBarsAfter}
@@ -519,6 +585,7 @@ function App() {
           onMoveBarLine={moveBarLine}
           onAddSection={addSectionAfterLine}
           onMergeSection={mergeSection}
+          onMoveSection={moveSection}
           onDeleteSection={deleteSection}
           onPlayLine={handlePlayLine}
           onLoopLine={handleLoopLine}
@@ -526,7 +593,7 @@ function App() {
           onStopLine={handleStopLine}
         />
       ) : viewMode === 'preview' ? (
-        <PrintPreview song={song} />
+        <PrintPreview song={song} activeBarId={activeBarId} activeChord={activeChord} activeSectionId={activeSectionId} />
       ) : viewMode === 'help' ? (
         <HelpView />
       ) : (
