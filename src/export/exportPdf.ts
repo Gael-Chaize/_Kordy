@@ -2,7 +2,7 @@ import { PDFDocument, rgb, pushGraphicsState, popGraphicsState, rectangle, clip,
 import fontkit from '@pdf-lib/fontkit'
 import regularUrl from '@fontsource/noto-sans/files/noto-sans-latin-400-normal.woff?url'
 import boldUrl from '@fontsource/noto-sans/files/noto-sans-latin-800-normal.woff?url'
-import { pdfFilename, type PdfDestination } from './pdfDestination'
+import { savePdfBlob, type PdfDestination } from './pdfDestination'
 
 type Fonts = { regular: PDFFont; bold: PDFFont }
 
@@ -41,11 +41,16 @@ function renderSheet(sheet: HTMLElement, page: PDFPage, fonts: Fonts) {
     let run = ''
     let left = 0
     let top = 0
+    const tracked = Math.abs(parseFloat(css.letterSpacing) || 0) > 0.001
     for (let i = 0; i < node.length; i++) {
       range.setStart(node, i)
       range.setEnd(node, i + 1)
       const rect = range.getBoundingClientRect()
       if (rect.width === 0) continue
+      if (tracked) {
+        drawText(node.data[i].replace(/\s/, ' '), rect.left, rect.top, css)
+        continue
+      }
       if (run && Math.abs(rect.top - top) > 0.5) {
         drawText(run, left, top, css)
         run = ''
@@ -120,18 +125,5 @@ export async function exportPdf(title: string, destination: PdfDestination | nul
   }
   const bytes = await documentPdf.save()
   const blob = new Blob([new Uint8Array(bytes).buffer], { type: 'application/pdf' })
-  if (destination) {
-    const writable = await destination.createWritable()
-    await writable.write(blob)
-    await writable.close()
-  } else {
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = pdfFilename(title)
-    document.body.append(link)
-    link.click()
-    link.remove()
-    window.setTimeout(() => URL.revokeObjectURL(url), 1000)
-  }
+  await savePdfBlob(blob, title, destination)
 }

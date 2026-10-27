@@ -23,6 +23,7 @@ export function SongLibrary({ songs, activeSongId, onLoad, onClose }: Props) {
       </div>
       <p>Songs and current drafts are kept in this browser. Use Save song to save your changes.</p>
       <div className="library-list">
+        {songs.length === 0 && <p>No songs saved in this browser.</p>}
         {songs.map(entry => (
           <button key={entry.id} type="button" className="library-song" onClick={() => onLoad(entry.id)}>
             <strong>{entry.history.present.title || 'Untitled chart'}</strong>

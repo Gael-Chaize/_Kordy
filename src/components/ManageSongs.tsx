@@ -7,9 +7,10 @@ type Props = {
   songs: SavedSong[]
   activeSongId: string
   onImport: (songs: Song[]) => void
+  onDelete: (ids: string[]) => void
 }
 
-export function ManageSongs({ songs, activeSongId, onImport }: Props) {
+export function ManageSongs({ songs, activeSongId, onImport, onDelete }: Props) {
   const input = useRef<HTMLInputElement>(null)
   const [selected, setSelected] = useState<Set<string>>(() => new Set())
   const [busy, setBusy] = useState(false)
@@ -51,6 +52,14 @@ export function ManageSongs({ songs, activeSongId, onImport }: Props) {
     setMessage(`${chosen.length} song${chosen.length === 1 ? '' : 's'} exported in one bundle.`)
   }
 
+  function deleteSongs() {
+    if (!chosen.length || !window.confirm('Are you sure?')) return
+    onDelete(chosen.map(entry => entry.id))
+    setSelected(new Set())
+    setError('')
+    setMessage(`${chosen.length} song${chosen.length === 1 ? '' : 's'} deleted.`)
+  }
+
   return (
     <section className="manage-songs" aria-labelledby="manage-songs-title">
       <h2 id="manage-songs-title">Manage songs</h2>
@@ -61,6 +70,9 @@ export function ManageSongs({ songs, activeSongId, onImport }: Props) {
         <button type="button" className="secondary-button" disabled={!chosen.length || busy} onClick={exportSongs}>
           Export selected songs
         </button>
+        <button type="button" className="secondary-button delete-songs-button" disabled={!chosen.length || busy} onClick={deleteSongs}>
+          Delete selected songs
+        </button>
         <input ref={input} type="file" accept=".json,application/json" multiple hidden aria-label="Import song bundles" onChange={importFiles} />
       </div>
       <p className="manage-song-note">Export includes the current version of each song, including unsaved changes, lyrics and preview settings. Import adds songs to this browser without replacing existing songs.</p>
@@ -68,7 +80,7 @@ export function ManageSongs({ songs, activeSongId, onImport }: Props) {
       {error && <p className="manage-song-error" role="alert">{error}</p>}
       <div className="manage-song-selection">
         <label>
-          <input type="checkbox" checked={chosen.length === songs.length && songs.length > 0}
+          <input type="checkbox" disabled={!songs.length} checked={chosen.length === songs.length && songs.length > 0}
             ref={element => { if (element) element.indeterminate = chosen.length > 0 && chosen.length < songs.length }}
             onChange={event => setSelected(event.target.checked ? new Set(songs.map(song => song.id)) : new Set())} />
           Select all
@@ -76,6 +88,7 @@ export function ManageSongs({ songs, activeSongId, onImport }: Props) {
         <span>{chosen.length} / {songs.length} selected</span>
       </div>
       <div className="manage-song-list">
+        {songs.length === 0 && <p className="manage-song-note">No songs saved in this browser.</p>}
         {songs.map(entry => (
           <label className="manage-song-row" key={entry.id}>
             <input type="checkbox" checked={selected.has(entry.id)}

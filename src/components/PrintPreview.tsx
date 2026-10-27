@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import type { Bar, Section, Song } from '../music/types'
 import { transposeBar } from '../music/transpose'
 import { defaultPreviewFontSize, defaultSectionFontSize, defaultHeaderFontSize, defaultChordColor, defaultGridColor } from '../music/previewSettings'
+import { FittedLyrics } from './FittedLyrics'
 
 type PrintPreviewProps = {
   song: Song
@@ -167,7 +168,7 @@ function PreviewBar({ bar, song, activeBarId, activeChord, measuring }: PrintPre
   if (!tokens.length) tokens.push('%')
   return (
     <div className={`print-bar-cell${!measuring && bar.id === activeBarId ? ' active-bar' : ''}`} data-print-bar-id={bar.id}>
-      <span className="print-lyrics">{bar.lyrics ?? ''}</span>
+      <FittedLyrics text={bar.lyrics ?? ''} fontSize={song.lyricsFontSize ?? defaultPreviewFontSize} bold={song.lyricsBold !== false} />
       <span className={`print-chords print-chord-count-${tokens.length}`}>
         {tokens.map((chord, index) => (
           <span key={index} className={[

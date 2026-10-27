@@ -28,10 +28,12 @@ export function TransposeControl({ value, onChange, chordFontSize, lyricsFontSiz
   const [draft, setDraft] = useState<string | null>(null)
   return (
     <div className="preview-toolbar">
+      <div className="preview-toolbar-row">
       <label className="transpose-control">
         <span>Transpose :</span>
         <input
           aria-label="Transpose"
+          title="Semitones (-13 to +13)"
           className={value !== 0 ? 'transposed' : ''}
           type="text"
           inputMode="text"
@@ -48,7 +50,23 @@ export function TransposeControl({ value, onChange, chordFontSize, lyricsFontSiz
           onKeyDown={event => { if (event.key === 'Enter') event.currentTarget.blur() }}
         />
       </label>
-      <span className="transpose-hint">Semitones (−13 to +13)</span>
+      <label className="preview-a4-control">
+        <input type="checkbox" role="switch" aria-label="Fit to A4 page" checked={fitToA4} disabled={exportingPdf}
+          onChange={event => onFitToA4Change(event.target.checked)} />
+        <span>Fit to A4 page</span>
+        {fitToA4 && a4PageCount > 0 && <small className="preview-page-count" role="status">({a4PageCount} {a4PageCount === 1 ? 'page' : 'pages'})</small>}
+      </label>
+      <div className="preview-pdf-actions">
+      <button type="button" className="secondary-button export-pdf-button" onClick={onExportPdf} disabled={exportingPdf}
+        title="Save a PDF file">
+        {exportingPdf ? 'Preparing PDF…' : 'Export PDF'}
+      </button>
+      <button type="button" className="secondary-button export-pdf-button" onClick={onPrintPdf} disabled={exportingPdf}>
+        Print PDF
+      </button>
+      </div>
+      </div>
+      <div className="preview-toolbar-row">
       {([
         ['chordFontSize', 'Chord :', chordFontSize],
         ['lyricsFontSize', 'Lyrics :', lyricsFontSize],
@@ -62,6 +80,8 @@ export function TransposeControl({ value, onChange, chordFontSize, lyricsFontSiz
           </select>
         </label>
       ))}
+      </div>
+      <div className="preview-toolbar-row">
       <div className="preview-bold-controls" role="group" aria-label="Bold">
         <span>Bold :</span>
         <label>Chord <input type="checkbox" aria-label="Bold chord" checked={chordBold}
@@ -69,7 +89,6 @@ export function TransposeControl({ value, onChange, chordFontSize, lyricsFontSiz
         <label>Lyrics <input type="checkbox" aria-label="Bold lyrics" checked={lyricsBold}
           onChange={event => onBoldChange('lyricsBold', event.target.checked)} /></label>
       </div>
-      <div className="preview-color-row">
       <label className="preview-color-control">
         <span>Chord color:</span>
         <input type="color" aria-label="Chord color" value={chordColor}
@@ -80,19 +99,6 @@ export function TransposeControl({ value, onChange, chordFontSize, lyricsFontSiz
         <input type="color" aria-label="Grid color" value={gridColor}
           onChange={event => onGridColorChange(event.target.value)} />
       </label>
-      <label className="preview-a4-control">
-        <input type="checkbox" role="switch" aria-label="Fit to A4 page" checked={fitToA4} disabled={exportingPdf}
-          onChange={event => onFitToA4Change(event.target.checked)} />
-        <span>Fit to A4 page</span>
-        {fitToA4 && a4PageCount > 0 && <small className="preview-page-count" role="status">({a4PageCount} {a4PageCount === 1 ? 'page' : 'pages'})</small>}
-      </label>
-      <button type="button" className="secondary-button export-pdf-button" onClick={onExportPdf} disabled={exportingPdf}
-        title="Save a PDF file">
-        {exportingPdf ? 'Preparing PDF…' : 'Export PDF'}
-      </button>
-      <button type="button" className="secondary-button export-pdf-button" onClick={onPrintPdf} disabled={exportingPdf}>
-        Print PDF
-      </button>
       </div>
     </div>
   )

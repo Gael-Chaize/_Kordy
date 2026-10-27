@@ -34,13 +34,13 @@ export function loadSongLibrary(): SongLibrary {
     const raw = window.localStorage.getItem(LIBRARY_KEY)
     if (raw) {
       const value = JSON.parse(raw) as SongLibrary
-      if (value.version === 1 && Array.isArray(value.songs) && value.songs.length > 0 &&
+      if (value.version === 1 && Array.isArray(value.songs) &&
         value.songs.every(entry => typeof entry.id === 'string' &&
           typeof entry.updatedAt === 'string' && isSongHistoryLike(entry.history))) {
         return {
           version: 1,
           activeSongId: value.songs.some(entry => entry.id === value.activeSongId)
-            ? value.activeSongId : value.songs[0].id,
+            ? value.activeSongId : value.songs[0]?.id ?? '',
           songs: value.songs.map(entry => ({
             ...entry,
             history: normalizeHistory(entry.history),

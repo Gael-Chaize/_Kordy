@@ -35,12 +35,20 @@ const initialSong: Song = {
 export function useProgression() {
   const [library, setLibrary] = useState(loadSongLibrary)
   const [storageError, setStorageError] = useState(false)
-  const activeEntry = library.songs.find(entry => entry.id === library.activeSongId)!
-  const history = activeEntry.history
-  const isDirty = JSON.stringify(history.present) !== JSON.stringify(activeEntry.savedSong)
+  const activeEntry = library.songs.find(entry => entry.id === library.activeSongId)
+  const history = activeEntry?.history ?? { past: [] as Song[], present: initialSong }
+  const isDirty = JSON.stringify(history.present) !== JSON.stringify(activeEntry?.savedSong)
 
   function setHistory(updater: (current: SongHistory) => SongHistory) {
-    setLibrary(current => ({
+    setLibrary(current => {
+      if (!current.songs.some(entry => entry.id === current.activeSongId)) {
+        const blankHistory: SongHistory = { past: [], present: initialSong }
+        const nextHistory = updater(blankHistory)
+        if (nextHistory === blankHistory) return current
+        const entry = { ...createSavedSong(nextHistory.present), history: nextHistory, savedSong: null }
+        return { ...current, activeSongId: entry.id, songs: [...current.songs, entry] }
+      }
+      return {
       ...current,
       songs: current.songs.map(entry => {
         if (entry.id !== current.activeSongId) return entry
@@ -49,7 +57,8 @@ export function useProgression() {
           ...entry, history: nextHistory, updatedAt: new Date().toISOString(),
         }
       }),
-    }))
+      }
+    })
   }
 
   const song = history.present
@@ -104,12 +113,18 @@ export function useProgression() {
   }
 
   function saveSong() {
-    setLibrary(current => ({
+    setLibrary(current => {
+      if (!current.songs.length) {
+        const entry = createSavedSong(initialSong)
+        return { ...current, activeSongId: entry.id, songs: [entry] }
+      }
+      return {
       ...current,
       songs: current.songs.map(entry => entry.id === current.activeSongId
         ? { ...entry, savedSong: entry.history.present, updatedAt: new Date().toISOString() }
         : entry),
-    }))
+      }
+    })
   }
 
   function saveSongCopy(song: Song) {
@@ -120,7 +135,19 @@ export function useProgression() {
   }
 
   function importSongs(songs: Song[]) {
-    setLibrary(current => ({ ...current, songs: appendImportedSongs(current.songs, songs) }))
+    setLibrary(current => {
+      const entries = appendImportedSongs(current.songs, songs)
+      return { ...current, activeSongId: current.activeSongId || entries[0]?.id || '', songs: entries }
+    })
+  }
+
+  function deleteSongs(ids: string[]) {
+    const selected = new Set(ids)
+    setLibrary(current => {
+      const songs = current.songs.filter(entry => !selected.has(entry.id))
+      return { ...current, songs, activeSongId: songs.some(entry => entry.id === current.activeSongId)
+        ? current.activeSongId : songs[0]?.id ?? '' }
+    })
   }
 
   function updateSongTitle(title: string) {
@@ -565,6 +592,7 @@ export function useProgression() {
     isDirty,
     saveSongCopy,
     importSongs,
+    deleteSongs,
     savedSongs: library.songs,
     activeSongId: library.activeSongId,
     storageError,

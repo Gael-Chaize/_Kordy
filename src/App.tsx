@@ -82,6 +82,7 @@ function App() {
     isDirty,
     saveSongCopy,
     importSongs,
+    deleteSongs,
     savedSongs,
     activeSongId,
     storageError,
@@ -420,13 +421,34 @@ function App() {
                 value={activeSong.title}
                 onChange={(event) => handleSongTitleChange(event.target.value)}
               />
+              <label className="style-control">
+                <span>Style:</span>
+                <input
+                  aria-label="Style"
+                  value={activeSong.style}
+                  onChange={(event) => handleSongStyleChange(event.target.value)}
+                />
+              </label>
             </div>
+            <div className="song-meta-row">
             <input
               aria-label="Artist"
               className="song-artist"
               value={activeSong.artist}
               onChange={(event) => handleSongArtistChange(event.target.value)}
             />
+              <label className="tempo-control">
+                <span>Tempo:</span>
+                <input
+                  aria-label="Tempo"
+                  type="number"
+                  min="30"
+                  max="260"
+                  value={activeSong.tempo}
+                  onChange={(event) => handleTempoChange(event.target.valueAsNumber)}
+                />
+              </label>
+            </div>
             <div className="title-actions">
               <button
                 type="button"
@@ -456,35 +478,19 @@ function App() {
                   }
                 }}
               >Save song</button>
-              <button
-                type="button"
-                className="secondary-button"
-                onClick={() =>
-                  handleViewModeChange(viewMode === 'edit' ? 'preview' : 'edit')
-                }
-              >
-                {viewMode === 'edit' ? 'Preview' : 'Back to edit'}
-              </button>
-              <button
-                type="button"
-                className="secondary-button"
-                onClick={() => handleViewModeChange('generate')}
-              >
-                Generate
-              </button>
-              <button
-                type="button"
-                className="secondary-button"
-                onClick={() =>
-                  handleViewModeChange(viewMode === 'help' ? 'edit' : 'help')
-                }
-              >
-                Help
-              </button>
-              <button type="button" className="secondary-button"
-                onClick={() => handleViewModeChange(viewMode === 'manage' ? 'edit' : 'manage')}>
-                Manage songs
-              </button>
+              {([
+                ['edit', 'Edit'],
+                ['preview', 'Preview'],
+                ['help', 'Help'],
+                ['manage', 'Manage songs'],
+              ] as const).map(([mode, label]) => (
+                <button key={mode} type="button"
+                  className={`secondary-button page-button${viewMode === mode ? ' active' : ''}`}
+                  aria-current={viewMode === mode ? 'page' : undefined}
+                  onClick={() => handleViewModeChange(mode)}>
+                  {label}
+                </button>
+              ))}
             </div>
             <p className="save-status" role="status">
               {storageError
@@ -496,14 +502,6 @@ function App() {
         </div>
         <div className="transport-stack">
           <div className="transport-panel">
-            <label className="style-control">
-              <span>Style</span>
-              <input
-                aria-label="Style"
-                value={activeSong.style}
-                onChange={(event) => handleSongStyleChange(event.target.value)}
-              />
-            </label>
             <button
               type="button"
               className="undo-button"
@@ -516,16 +514,6 @@ function App() {
             >
               Undo
             </button>
-            <label className="tempo-control">
-              <span>Tempo</span>
-              <input
-                type="number"
-                min="30"
-                max="260"
-                value={activeSong.tempo}
-                onChange={(event) => handleTempoChange(event.target.valueAsNumber)}
-              />
-            </label>
             <button
               type="button"
               className={`play-button${isPlaying ? ' playing' : ''}`}
@@ -590,6 +578,7 @@ function App() {
           a4PageCount={a4PageCount}
           exportingPdf={pdfAction !== null}
           onExportPdf={() => {
+            if (pdfAction || pdfRunning.current) return
             handleStopLine()
             setPdfError('')
             pdfDestination.current = choosePdfDestination(song.title)
@@ -599,6 +588,7 @@ function App() {
             setPdfAction('export')
           }}
           onPrintPdf={() => {
+            if (pdfAction || pdfRunning.current) return
             handleStopLine()
             setPdfError('')
             setFitToA4(true)
@@ -660,7 +650,10 @@ function App() {
       ) : viewMode === 'help' ? (
         <HelpView />
       ) : viewMode === 'manage' ? (
-        <ManageSongs songs={savedSongs} activeSongId={activeSongId} onImport={importSongs} />
+        <ManageSongs songs={savedSongs} activeSongId={activeSongId} onImport={importSongs} onDelete={ids => {
+          handleStopLine()
+          deleteSongs(ids)
+        }} />
       ) : (
         <GeneratorView
           song={generatedSong.sections.length > 0 ? generatedSong : null}
