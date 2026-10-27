@@ -362,7 +362,16 @@ export function buildChordNotes(input: string, octave = 4) {
 
   const resolvedIntervals = applyChordModifiers(intervals, chord.modifiers)
 
-  return resolvedIntervals.map((interval) => midiToNote(rootMidi + interval))
+  const notes = resolvedIntervals.map(interval => rootMidi + interval)
+  const slashBass = splitChordParts(chord.normalized).slashBass
+  if (!slashBass) return notes.map(midiToNote)
+  const bassMidi = 12 * (octave + 1) + rootToSemitone(slashBass)
+  const voiced = notes.map(note => {
+    while (note < bassMidi) note += 12
+    return note
+  })
+  if (!voiced.includes(bassMidi)) voiced.push(bassMidi)
+  return [...new Set(voiced)].sort((a, b) => a - b).map(midiToNote)
 }
 
 export function buildBarChordNotes(
@@ -370,7 +379,7 @@ export function buildBarChordNotes(
   previousChord: string | null = null,
   octave = 4,
 ) {
-  const parsedBar = parseBarChords(input, previousChord)
+  const parsedBar = parseBarChords(isEmptyChord(input) && previousChord ? '%' : input, previousChord)
 
   if (!parsedBar.valid || !parsedBar.complete) {
     return null
@@ -400,8 +409,10 @@ export function buildBassPatternNotes(chordSymbol: string, octave = 2) {
   const patternDegrees =
     intervals.length >= 4 ? [0, 1, 2, 3, 2, 1, 0, 1] : [0, 1, 2, 0, 2, 1, 0, 1]
 
+  const slashBass = splitChordParts(chord.normalized).slashBass
+  const bassMidi = slashBass ? 12 * (octave + 1) + rootToSemitone(slashBass) : rootMidi
   return patternDegrees.map((degreeIndex) =>
-    midiToNote(rootMidi + intervals[degreeIndex]),
+    midiToNote(degreeIndex === 0 ? bassMidi : rootMidi + intervals[degreeIndex]),
   )
 }
 
@@ -584,7 +595,7 @@ function rewriteSharpExtensions(input: string) {
       lookahead += 1
     }
 
-    let digitStart = lookahead
+    const digitStart = lookahead
     while (lookahead < input.length && /\d/.test(input[lookahead])) {
       lookahead += 1
     }

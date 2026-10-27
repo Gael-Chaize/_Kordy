@@ -402,7 +402,14 @@ export function ProgressionView({
                                   event.target.value,
                                 )
                               }
-                              onKeyDown={(event) => handleBarKeyDown(event)}
+                              onKeyDown={(event) => {
+                                if (event.key === 'Enter' && !event.nativeEvent.isComposing) {
+                                  event.preventDefault()
+                                  onBarBlur(section.id, bar.id)
+                                } else {
+                                  handleBarKeyDown(event)
+                                }
+                              }}
                               onBlur={() => onBarBlur(section.id, bar.id)}
                             />
                             </div>

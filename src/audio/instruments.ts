@@ -27,7 +27,7 @@ export type BassInstrument = {
     time?: Tone.Unit.Time,
     velocity?: number,
   ) => void
-  releaseAll: () => void
+  releaseAll: (time?: Tone.Unit.Time) => void
   dispose: () => void
 }
 
@@ -81,8 +81,8 @@ export function createBassInstrument(): BassInstrument {
     triggerAttackRelease(note, duration, time, velocity) {
       instrument.triggerAttackRelease(note, duration, time, velocity)
     },
-    releaseAll() {
-      instrument.triggerRelease()
+    releaseAll(time) {
+      instrument.triggerRelease(time)
     },
     dispose() {
       instrument.dispose()
@@ -268,7 +268,9 @@ function connectInstrument(
 }
 
 function getMaxPolyphony() {
-  return isMobileAudioDevice() ? 12 : 24
+  // Extended chords need room for the next attack while prior voices release.
+  // PolySynth allocates voices on demand; these are ceilings, not upfront costs.
+  return isMobileAudioDevice() ? 24 : 32
 }
 
 function isMobileAudioDevice() {

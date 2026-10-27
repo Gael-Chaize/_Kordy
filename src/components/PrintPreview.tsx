@@ -171,10 +171,12 @@ function PreviewBar({ bar, song, activeBarId, activeChord, measuring }: PrintPre
       <FittedLyrics text={bar.lyrics ?? ''} fontSize={song.lyricsFontSize ?? defaultPreviewFontSize} bold={song.lyricsBold !== false} />
       <span className={`print-chords print-chord-count-${tokens.length}`}>
         {tokens.map((chord, index) => (
-          <span key={index} className={[
-            tokens.length === 4 && (index === 1 || index === 3) ? 'with-row-separator' : '',
-            !measuring && activeChord?.barId === bar.id && activeChord.chordIndex === index ? 'current-chord-text' : '',
-          ].filter(Boolean).join(' ')}>{chord}</span>
+          <span key={index} className="print-chord-slot">
+            {index > 0 && (tokens.length !== 4 || index % 2 === 1) && (
+              <span className="print-chord-separator" aria-hidden="true">|</span>
+            )}
+            <span className={`print-chord-symbol${!measuring && activeChord?.barId === bar.id && activeChord.chordIndex === index ? ' current-chord-text' : ''}`}>{chord}</span>
+          </span>
         ))}
       </span>
     </div>

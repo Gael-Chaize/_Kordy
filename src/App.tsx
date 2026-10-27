@@ -133,12 +133,17 @@ function App() {
     }
   }, [pdfAction, song.title])
   const tempoRef = useRef(activeSong.tempo)
+  const playbackSettingsRef = useRef({ drumsEnabled, bassEnabled, pianoSound })
   const playbackIdRef = useRef(0)
   const lastPreviewRef = useRef<string | null>(null)
 
   useEffect(() => {
     tempoRef.current = activeSong.tempo
   }, [activeSong.tempo])
+
+  useEffect(() => {
+    playbackSettingsRef.current = { drumsEnabled, bassEnabled, pianoSound }
+  }, [drumsEnabled, bassEnabled, pianoSound])
 
   function clearPlaybackState() {
     setIsPlaying(false)
@@ -165,6 +170,7 @@ function App() {
         drumsEnabled,
         bassEnabled,
         pianoSound,
+        getSettings: () => playbackSettingsRef.current,
         startBarId,
         loopBarCount,
         loopSectionId,

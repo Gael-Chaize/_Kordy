@@ -780,7 +780,6 @@
 }
 
 .print-chords {
-  --chord-separator-gap: 0.28em;
   color: var(--preview-chord-color, #2457c5);
   display: grid;
   align-items: center;
@@ -794,42 +793,30 @@
   width: 100%;
 }
 
-.print-chords span {
-  box-sizing: border-box;
+.print-chord-slot {
+  position: relative;
+  width: 100%;
   min-width: 0;
-  max-width: 100%;
+}
+
+.print-chord-symbol {
+  display: block;
   overflow: hidden;
-  padding: 0 0.04em;
+  margin: 0 0.16em;
   text-overflow: clip;
 }
 
-.print-chords span + span::before {
-  content: "|";
-  display: inline-block;
-  margin-right: var(--chord-separator-gap);
-}
-
-.print-chord-count-3 {
-  --chord-separator-gap: 0.2em;
+.print-chord-separator {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform: translateX(-50%);
 }
 
 .print-chord-count-4 {
-  --chord-separator-gap: 0.12em;
   font-size: var(--preview-chord-size, 22px);
   grid-template-columns: repeat(2, minmax(0, 1fr));
   row-gap: 0.32em;
-}
-
-.print-chord-count-4 span + span::before {
-  content: none;
-}
-
-.print-chord-count-4 .with-row-separator::before {
-  content: "|";
-  display: inline-block;
-  width: 0;
-  margin-left: -0.18em;
-  margin-right: 0.42em;
 }
 
 .print-chord-count-2 {
