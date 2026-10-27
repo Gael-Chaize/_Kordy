@@ -172,7 +172,7 @@ function PreviewBar({ bar, song, activeBarId, activeChord, measuring }: PrintPre
       <span className={`print-chords print-chord-count-${tokens.length}`}>
         {tokens.map((chord, index) => (
           <span key={index} className="print-chord-slot">
-            {index > 0 && (tokens.length !== 4 || index % 2 === 1) && (
+            {index > 0 && (
               <span className="print-chord-separator" aria-hidden="true">|</span>
             )}
             <span className={`print-chord-symbol${!measuring && activeChord?.barId === bar.id && activeChord.chordIndex === index ? ' current-chord-text' : ''}`}>{chord}</span>
