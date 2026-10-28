@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
 import type { Bar, Section, Song } from '../music/types'
 import { transposeBar } from '../music/transpose'
 import { defaultPreviewFontSize, defaultSectionFontSize, defaultHeaderFontSize, defaultChordColor, defaultGridColor } from '../music/previewSettings'
@@ -9,6 +9,7 @@ type PrintPreviewProps = {
   activeBarId: string | null
   activeSectionId: string | null
   activeChord: { barId: string; chordIndex: number | null } | null
+  chart?: boolean
   fitToA4?: boolean
   onPageCountChange?: (count: number) => void
   onPrintReady?: () => void
@@ -18,7 +19,7 @@ type Fragment = { section: Section; lines: Bar[][]; continued: boolean }
 type Page = Fragment[]
 
 export function PrintPreview(props: PrintPreviewProps) {
-  const { song, fitToA4 = false, onPageCountChange, onPrintReady } = props
+  const { song, chart = true, fitToA4 = false, onPageCountChange, onPrintReady } = props
   const measurement = useRef<HTMLDivElement>(null)
   const [pages, setPages] = useState<Page[]>([])
   useEffect(() => {
@@ -70,7 +71,7 @@ export function PrintPreview(props: PrintPreviewProps) {
         const headingHeight = heading.offsetHeight + parseFloat(getComputedStyle(heading).marginBottom)
         const rows = [...element.querySelectorAll<HTMLElement>('.print-bar-grid')]
         // Reserve a top border when a row starts a new page fragment.
-        const heights = rows.map((row, rowIndex) => row.offsetHeight + (rowIndex ? 2 : 0))
+        const heights = rows.map((row, rowIndex) => row.offsetHeight + (rowIndex ? (chart ? 2 : 12) : 0))
         const lines = chunkBars(section.bars)
         const wholeHeight = headingHeight + heights.reduce((sum, height) => sum + height, 0)
         if (wholeHeight <= capacity || lines.length === 0) {
@@ -102,11 +103,11 @@ export function PrintPreview(props: PrintPreviewProps) {
     observer.observe(node)
     node.querySelectorAll('.print-chart-header, .print-section-header, .print-bar-grid').forEach(el => observer.observe(el))
     return () => observer.disconnect()
-  }, [song, fitToA4, onPageCountChange])
+  }, [song, chart, fitToA4, onPageCountChange])
 
   const fullSections = song.sections.map(section => ({ section, lines: chunkBars(section.bars), continued: false }))
   const renderPage = (fragments: Page, pageIndex?: number, total?: number, measuring = false) => (
-    <article className={`print-preview${fitToA4 ? ' a4-page' : ''}`}
+    <article className={`print-preview${fitToA4 ? ' a4-page' : ''}${chart ? '' : ' songbook-preview'}`}
       aria-label={pageIndex === undefined ? 'Printable chord chart preview' : `Page ${pageIndex + 1} of ${total}`}
       style={style}>
       <ChartHeader song={song} />
@@ -115,15 +116,14 @@ export function PrintPreview(props: PrintPreviewProps) {
           <section className="print-section" key={section.id} data-print-section-id={section.id}>
             <div className="print-section-header">
               <h2 className={!measuring && props.activeSectionId === section.id ? 'playing-section-title' : ''}>
-                {section.name}{continued && <small className="section-continuation"> (continued)</small>}
+                {section.name}{section.repeatCount > 1 && ` (x ${section.repeatCount})`}{continued && <small className="section-continuation"> (continued)</small>}
               </h2>
-              {section.repeatCount > 1 && <span>Repeat x{section.repeatCount}</span>}
             </div>
             <div className="print-bar-lines">
               {lines.map(line => (
-                <div className="print-bar-grid" key={line[0].id}>
+                chart ? <div className="print-bar-grid" key={line[0].id}>
                   {line.map(bar => <PreviewBar key={bar.id} bar={bar} {...props} measuring={measuring} />)}
-                </div>
+                </div> : <SongbookLine key={line[0].id} bars={line} {...props} measuring={measuring} />
               ))}
             </div>
           </section>
@@ -179,6 +179,41 @@ function PreviewBar({ bar, song, activeBarId, activeChord, measuring }: PrintPre
           </span>
         ))}
       </span>
+    </div>
+  )
+}
+
+function SongbookLine({ bars, ...props }: PrintPreviewProps & { bars: Bar[]; measuring: boolean }) {
+  const ref = useRef<HTMLDivElement>(null)
+  useLayoutEffect(() => {
+    const row = ref.current!
+    const fit = () => {
+      row.style.setProperty('--songbook-scale', '1')
+      const available = row.clientWidth
+      if (available && row.scrollWidth > available) {
+        row.style.setProperty('--songbook-scale', String(available / row.scrollWidth * 0.99))
+      }
+    }
+    fit()
+    const observer = new ResizeObserver(fit)
+    observer.observe(row)
+    void document.fonts.ready.then(fit)
+    return () => observer.disconnect()
+  }, [bars, props.song])
+  return <div ref={ref} className="print-bar-grid">{bars.map(bar => <SongbookBar key={bar.id} bar={bar} {...props} />)}</div>
+}
+
+function SongbookBar({ bar, song, activeBarId, activeChord, measuring }: PrintPreviewProps & { bar: Bar; measuring: boolean }) {
+  const tokens = transposeBar(bar.chord, song.transpose ?? 0).trim().split(/\s*\|\s*|\s+/).filter(Boolean)
+  if (!tokens.length) tokens.push('%')
+  return (
+    <div className={`songbook-bar${!measuring && bar.id === activeBarId ? ' active-bar' : ''}`} data-print-bar-id={bar.id}>
+      <div className="songbook-chords">
+        {tokens.map((chord, index) => (
+          <span key={index} className={`${chord === '%' ? 'songbook-repeat' : ''}${!measuring && activeChord?.barId === bar.id && activeChord.chordIndex === index ? ' current-chord-text' : ''}`}>{chord}</span>
+        ))}
+      </div>
+      <div className="songbook-lyrics">{bar.lyrics?.trim() || '\u00a0'}</div>
     </div>
   )
 }

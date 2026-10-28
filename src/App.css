@@ -744,12 +744,6 @@
   letter-spacing: 0;
 }
 
-.print-section-header span {
-  color: var(--muted);
-  font-size: calc(var(--preview-section-size, 20px) * 0.65);
-  font-weight: 800;
-}
-
 .print-bar-lines {
   display: grid;
   gap: 0;
@@ -1539,4 +1533,43 @@
   .print-chords {
     font-size: var(--preview-chord-size, 22px);
   }
+}
+
+/* Songbook layout: four measures per line, sized around their lyrics. */
+.songbook-preview .print-bar-grid {
+  display: flex;
+  align-items: flex-start;
+  gap: 0;
+  border: 0;
+}
+.songbook-preview .print-bar-lines { gap: 12px; }
+.songbook-bar {
+  display: grid;
+  flex: 0 0 auto;
+  min-width: 0;
+  row-gap: 3px;
+  padding-inline-end: 0.65em;
+  font-size: calc(var(--preview-lyrics-size, 22px) * var(--songbook-scale, 1));
+}
+.songbook-chords {
+  display: flex;
+  align-items: baseline;
+  min-height: 1.2em;
+  gap: 0.65em;
+  justify-content: space-between;
+  color: var(--preview-chord-color, #2457c5);
+  font-size: calc(var(--preview-chord-size, 22px) * var(--songbook-scale, 1));
+  font-weight: var(--preview-chord-weight, 800);
+  line-height: 1.2;
+  white-space: nowrap;
+}
+.songbook-lyrics {
+  font-size: calc(var(--preview-lyrics-size, 22px) * var(--songbook-scale, 1));
+  font-weight: var(--preview-lyrics-weight, 800);
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
+.songbook-repeat {
+  font-size: 70%;
 }

@@ -16,6 +16,8 @@ type Props = {
   onChordColorChange: (color: string) => void
   gridColor: string
   onGridColorChange: (color: string) => void
+  chart: boolean
+  onChartChange: (enabled: boolean) => void
   fitToA4: boolean
   a4PageCount: number
   onFitToA4Change: (enabled: boolean) => void
@@ -24,7 +26,7 @@ type Props = {
   onPrintPdf: () => void
 }
 
-export function TransposeControl({ value, onChange, chordFontSize, lyricsFontSize, sectionFontSize, headerFontSize, onFontSizeChange, chordBold, lyricsBold, onBoldChange, chordColor, onChordColorChange, gridColor, onGridColorChange, fitToA4, a4PageCount, onFitToA4Change, exportingPdf, onExportPdf, onPrintPdf }: Props) {
+export function TransposeControl({ value, onChange, chordFontSize, lyricsFontSize, sectionFontSize, headerFontSize, onFontSizeChange, chordBold, lyricsBold, onBoldChange, chordColor, onChordColorChange, gridColor, onGridColorChange, chart, onChartChange, fitToA4, a4PageCount, onFitToA4Change, exportingPdf, onExportPdf, onPrintPdf }: Props) {
   const [draft, setDraft] = useState<string | null>(null)
   return (
     <div className="preview-toolbar">
@@ -98,6 +100,11 @@ export function TransposeControl({ value, onChange, chordFontSize, lyricsFontSiz
         <span>Grid color:</span>
         <input type="color" aria-label="Grid color" value={gridColor}
           onChange={event => onGridColorChange(event.target.value)} />
+      </label>
+      <label className="preview-a4-control">
+        <input type="checkbox" role="switch" aria-label="Chart" checked={chart} disabled={exportingPdf}
+          onChange={event => onChartChange(event.target.checked)} />
+        <span>Chart</span>
       </label>
       </div>
     </div>

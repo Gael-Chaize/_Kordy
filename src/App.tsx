@@ -43,6 +43,7 @@ function App() {
   const [viewMode, setViewMode] = useState<ViewMode>('edit')
   const [libraryOpen, setLibraryOpen] = useState(false)
   const [fitToA4, setFitToA4] = useState(false)
+  const [chart, setChart] = useState(true)
   const [a4PageCount, setA4PageCount] = useState(0)
   const [pdfAction, setPdfAction] = useState<'export' | 'print' | null>(null)
   const [pdfError, setPdfError] = useState('')
@@ -581,6 +582,7 @@ function App() {
       {viewMode === 'preview' && (
         <TransposeControl key={activeSongId} value={song.transpose ?? 0}
           fitToA4={fitToA4}
+          chart={chart} onChartChange={setChart}
           a4PageCount={a4PageCount}
           exportingPdf={pdfAction !== null}
           onExportPdf={() => {
@@ -648,10 +650,10 @@ function App() {
       ) : viewMode === 'preview' ? (
         fitToA4 ? (
           <A4Preview>
-            <PrintPreview song={song} activeBarId={activeBarId} activeChord={activeChord} activeSectionId={activeSectionId} fitToA4 onPageCountChange={setA4PageCount} onPrintReady={pdfAction ? printReadyPages : undefined} />
+            <PrintPreview chart={chart} song={song} activeBarId={activeBarId} activeChord={activeChord} activeSectionId={activeSectionId} fitToA4 onPageCountChange={setA4PageCount} onPrintReady={pdfAction ? printReadyPages : undefined} />
           </A4Preview>
         ) : (
-        <PrintPreview song={song} activeBarId={activeBarId} activeChord={activeChord} activeSectionId={activeSectionId} />
+        <PrintPreview chart={chart} song={song} activeBarId={activeBarId} activeChord={activeChord} activeSectionId={activeSectionId} />
         )
       ) : viewMode === 'help' ? (
         <HelpView />
