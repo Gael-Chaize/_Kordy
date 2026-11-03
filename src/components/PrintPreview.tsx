@@ -205,12 +205,11 @@ function SongbookLine({ bars, ...props }: PrintPreviewProps & { bars: Bar[]; mea
 
 function SongbookBar({ bar, song, activeBarId, activeChord, measuring }: PrintPreviewProps & { bar: Bar; measuring: boolean }) {
   const tokens = transposeBar(bar.chord, song.transpose ?? 0).trim().split(/\s*\|\s*|\s+/).filter(Boolean)
-  if (!tokens.length) tokens.push('%')
   return (
     <div className={`songbook-bar${!measuring && bar.id === activeBarId ? ' active-bar' : ''}`} data-print-bar-id={bar.id}>
       <div className="songbook-chords">
         {tokens.map((chord, index) => (
-          <span key={index} className={`${chord === '%' ? 'songbook-repeat' : ''}${!measuring && activeChord?.barId === bar.id && activeChord.chordIndex === index ? ' current-chord-text' : ''}`}>{chord}</span>
+          <span key={index} className={!measuring && activeChord?.barId === bar.id && activeChord.chordIndex === index ? 'current-chord-text' : ''}>{chord === '%' ? '' : chord}</span>
         ))}
       </div>
       <div className="songbook-lyrics">{bar.lyrics?.trim() || '\u00a0'}</div>
